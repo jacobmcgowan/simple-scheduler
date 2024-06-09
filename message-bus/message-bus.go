@@ -48,7 +48,61 @@ func (msgBus *MessageBus) Close() error {
 	return nil
 }
 
-func (msgBus MessageBus) Publish(exchange string, key string, json string) error {
+func (msgBus MessageBus) Register(exchange string, bindings map[string][]string) error {
+	if msgBus.Connection == nil {
+		return errors.New("a connection has not been established")
+	}
+
+	ch, err := msgBus.Connection.Channel()
+	if err != nil {
+		return fmt.Errorf("failed to open a channel: %s", err)
+	}
+	defer ch.Close()
+
+	err = ch.ExchangeDeclare(
+		exchange,
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to declare exchange %s: %s", exchange, err)
+	}
+
+	for queue, keys := range bindings {
+		q, err := ch.QueueDeclare(
+			queue,
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to declare queue %s: %s", queue, err)
+		}
+
+		for _, key := range keys {
+			err = ch.QueueBind(
+				q.Name,
+				key,
+				exchange,
+				false,
+				nil,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to bind queue %s to exchange %s with key %s: %s", q.Name, exchange, key, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (msgBus MessageBus) Publish(exchange string, key string, body []byte) error {
 	if msgBus.Connection == nil {
 		return errors.New("a connection has not been established")
 	}
@@ -57,7 +111,7 @@ func (msgBus MessageBus) Publish(exchange string, key string, json string) error
 		Exchange:   exchange,
 		Connection: msgBus.Connection,
 	}
-	err := pro.Publish(key, json)
+	err := pro.Publish(key, body)
 	if err != nil {
 		return fmt.Errorf("failed to publish message: %s", err)
 	}
@@ -65,7 +119,7 @@ func (msgBus MessageBus) Publish(exchange string, key string, json string) error
 	return nil
 }
 
-func (msgBus *MessageBus) Subscribe(exchange string, key string, queue string, received func(json string) bool) error {
+func (msgBus *MessageBus) Subscribe(queue string, received func(body []byte) bool) error {
 	if msgBus.Connection == nil {
 		return errors.New("a connection has not been established")
 	}
@@ -76,8 +130,6 @@ func (msgBus *MessageBus) Subscribe(exchange string, key string, queue string, r
 	}
 
 	con := Consumer{
-		Exchange:        exchange,
-		Key:             key,
 		Queue:           queue,
 		Connection:      msgBus.Connection,
 		MessageReceived: received,

@@ -3,6 +3,7 @@ package work
 type MessageBus interface {
 	Connect(connStr string) error
 	Close() error
-	Publish(exchange string, key string, json string) error
-	Subscribe(exchange string, key string, queue string, received func(json string) bool) error
+	Register(exchange string, bindings map[string][]string) error
+	Publish(exchange string, key string, body []byte) error
+	Subscribe(exchange string, key string, queue string, received func(body []byte) bool) error
 }

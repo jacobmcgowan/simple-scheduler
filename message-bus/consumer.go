@@ -7,11 +7,9 @@ import (
 )
 
 type Consumer struct {
-	Exchange        string
-	Key             string
 	Queue           string
 	Connection      *amqp.Connection
-	MessageReceived func(json string) bool
+	MessageReceived func(body []byte) bool
 	Subscribed      chan bool
 }
 
@@ -26,31 +24,8 @@ func (con *Consumer) Subscribe() error {
 	}
 	defer ch.Close()
 
-	q, err := ch.QueueDeclare(
-		con.Queue,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to declare queue %s: %s", con.Queue, err)
-	}
-
-	err = ch.QueueBind(
-		q.Name,
-		con.Key,
-		con.Exchange,
-		false,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to bind queue %s to exchange %s: %s", con.Queue, con.Exchange, err)
-	}
-
 	msgs, err := ch.Consume(
-		q.Name,
+		con.Queue,
 		"",
 		false,
 		false,
@@ -59,7 +34,7 @@ func (con *Consumer) Subscribe() error {
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to register consumer for queue %s: %s", q.Name, err)
+		return fmt.Errorf("failed to register consumer for queue %s: %s", con.Queue, err)
 	}
 
 	con.Subscribed = make(chan bool)
@@ -71,7 +46,7 @@ func (con *Consumer) Subscribe() error {
 			}
 
 			for msg := range msgs {
-				if con.MessageReceived(string(msg.Body[:])) {
+				if con.MessageReceived(msg.Body) {
 					ch.Ack(msg.DeliveryTag, false)
 				} else {
 					ch.Nack(msg.DeliveryTag, false, true)
