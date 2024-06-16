@@ -10,6 +10,6 @@ type Job struct {
 	RunExecutionTimeout int
 	RunStartTimeout     int
 	MaxQueueCount       int
-	AllowConcurrentRuns int
+	AllowConcurrentRuns bool
 	HeartbeatTimeout    int
 }

@@ -8,14 +8,14 @@ import (
 
 type Job struct {
 	Name                string `bson:"_id"`
-	Enabled             bool
-	NextRunAt           string
-	Interval            int
-	RunExecutionTimeout int
-	RunStartTimeout     int
-	MaxQueueCount       int
-	AllowConcurrentRuns int
-	HeartbeatTimeout    int
+	Enabled             bool   `bson:"enabled"`
+	NextRunAt           string `bson:"nextRunAt"`
+	Interval            int    `bson:"interval"`
+	RunExecutionTimeout int    `bson:"runExecutionTimeout"`
+	RunStartTimeout     int    `bson:"runStartTimeout"`
+	MaxQueueCount       int    `bson:"maxQueueCount"`
+	AllowConcurrentRuns bool   `bson:"allowConcurrentRuns"`
+	HeartbeatTimeout    int    `bson:"heartbeatTimeout"`
 }
 
 func (job Job) ToDto() dtos.Job {

@@ -10,10 +10,10 @@ import (
 
 type Run struct {
 	Id        primitive.ObjectID `bson:"_id"`
-	JobName   string
-	Status    string
-	StartTime string
-	EndTime   string
+	JobName   string             `bson:"jobName"`
+	Status    string             `bson:"status"`
+	StartTime string             `bson:"startTime"`
+	EndTime   string             `bson:"endTime"`
 }
 
 func (run Run) ToDto() dtos.Run {

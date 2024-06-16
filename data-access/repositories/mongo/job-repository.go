@@ -7,6 +7,7 @@ import (
 	mongoModels "github.com/jacobmcgowan/simple-scheduler/data-access/models/mongo"
 	"github.com/jacobmcgowan/simple-scheduler/dtos"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const JobsCollection = "jobs"
@@ -44,7 +45,7 @@ func (repo JobRepository) Browse() ([]dtos.Job, error) {
 func (repo JobRepository) Read(name string) (dtos.Job, error) {
 	var job mongoModels.Job
 	filter := bson.D{{
-		Key:   "name",
+		Key:   "_id",
 		Value: name,
 	}}
 	coll := repo.DbContext.Db.Collection(JobsCollection)
@@ -61,7 +62,7 @@ func (repo JobRepository) Edit(job dtos.Job) error {
 	jobDoc.FromDto(job)
 
 	filter := bson.D{{
-		Key:   "name",
+		Key:   "_id",
 		Value: job.Name,
 	}}
 	coll := repo.DbContext.Db.Collection(JobsCollection)
@@ -71,6 +72,23 @@ func (repo JobRepository) Edit(job dtos.Job) error {
 	}
 
 	return nil
+}
+
+func (repo JobRepository) Add(job dtos.Job) (string, error) {
+	jobDoc := mongoModels.Job{}
+	jobDoc.FromDto(job)
+
+	coll := repo.DbContext.Db.Collection(JobsCollection)
+	res, err := coll.InsertOne(repo.DbContext.Context, jobDoc)
+	if err != nil {
+		return "", fmt.Errorf("failed to add job: %s", err)
+	}
+
+	if id, ok := res.InsertedID.(primitive.ObjectID); ok {
+		return id.Hex(), nil
+	}
+
+	return "", fmt.Errorf("failed to parse id of job: %s", err)
 }
 
 func (repo JobRepository) SetNextRunTime(job dtos.Job) error {
@@ -83,7 +101,7 @@ func (repo JobRepository) SetNextRunTime(job dtos.Job) error {
 	intervals := (elapsed.Milliseconds() / int64(job.Interval)) + 1
 	nextRunAt := job.NextRunAt.Add(time.Duration(job.Interval * int(intervals)))
 	filter := bson.D{{
-		Key:   "name",
+		Key:   "_id",
 		Value: job.Name,
 	}}
 	update := bson.D{{
