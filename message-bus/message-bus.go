@@ -8,12 +8,12 @@ import (
 )
 
 type MessageBus struct {
-	Connection *amqp.Connection
-	Consumers  map[string]Consumer
+	connection *amqp.Connection
+	consumers  map[string]Consumer
 }
 
 func (msgBus *MessageBus) Connect(connStr string) error {
-	if msgBus.Connection != nil {
+	if msgBus.connection != nil {
 		return nil
 	}
 
@@ -21,39 +21,39 @@ func (msgBus *MessageBus) Connect(connStr string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to RabbitMQ: %s", err)
 	}
-	msgBus.Connection = conn
-	msgBus.Consumers = make(map[string]Consumer)
+	msgBus.connection = conn
+	msgBus.consumers = make(map[string]Consumer)
 
 	return nil
 }
 
 func (msgBus *MessageBus) Close() error {
-	if msgBus.Connection == nil {
+	if msgBus.connection == nil {
 		return nil
 	}
 
-	for _, con := range msgBus.Consumers {
+	for _, con := range msgBus.consumers {
 		con.Subscribed <- false
 	}
 
-	clear(msgBus.Consumers)
+	clear(msgBus.consumers)
 
-	err := msgBus.Connection.Close()
+	err := msgBus.connection.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close connection: %s", err)
 	}
 
-	msgBus.Connection = nil
+	msgBus.connection = nil
 
 	return nil
 }
 
 func (msgBus MessageBus) Register(exchange string, bindings map[string][]string) error {
-	if msgBus.Connection == nil {
+	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
 
-	ch, err := msgBus.Connection.Channel()
+	ch, err := msgBus.connection.Channel()
 	if err != nil {
 		return fmt.Errorf("failed to open a channel: %s", err)
 	}
@@ -103,13 +103,13 @@ func (msgBus MessageBus) Register(exchange string, bindings map[string][]string)
 }
 
 func (msgBus MessageBus) Publish(exchange string, key string, body []byte) error {
-	if msgBus.Connection == nil {
+	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
 
 	pro := Producer{
 		Exchange:   exchange,
-		Connection: msgBus.Connection,
+		Connection: msgBus.connection,
 	}
 	err := pro.Publish(key, body)
 	if err != nil {
@@ -120,18 +120,18 @@ func (msgBus MessageBus) Publish(exchange string, key string, body []byte) error
 }
 
 func (msgBus *MessageBus) Subscribe(queue string, received func(body []byte) bool) error {
-	if msgBus.Connection == nil {
+	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
 
-	_, hasConsumer := msgBus.Consumers[queue]
+	_, hasConsumer := msgBus.consumers[queue]
 	if hasConsumer {
 		return nil
 	}
 
 	con := Consumer{
 		Queue:           queue,
-		Connection:      msgBus.Connection,
+		Connection:      msgBus.connection,
 		MessageReceived: received,
 	}
 	err := con.Subscribe()
@@ -139,15 +139,15 @@ func (msgBus *MessageBus) Subscribe(queue string, received func(body []byte) boo
 		return fmt.Errorf("failed to subscribe: %s", err)
 	}
 
-	msgBus.Consumers[queue] = con
+	msgBus.consumers[queue] = con
 
 	return nil
 }
 
 func (msgBus *MessageBus) Unsubscribe(queue string) {
-	con, hasConsumer := msgBus.Consumers[queue]
+	con, hasConsumer := msgBus.consumers[queue]
 	if hasConsumer {
 		con.Subscribed <- false
-		delete(msgBus.Consumers, queue)
+		delete(msgBus.consumers, queue)
 	}
 }
