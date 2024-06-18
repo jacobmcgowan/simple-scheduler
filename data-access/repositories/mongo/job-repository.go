@@ -2,7 +2,6 @@ package mongoRepos
 
 import (
 	"fmt"
-	"time"
 
 	mongoModels "github.com/jacobmcgowan/simple-scheduler/data-access/models/mongo"
 	"github.com/jacobmcgowan/simple-scheduler/dtos"
@@ -57,18 +56,16 @@ func (repo JobRepository) Read(name string) (dtos.Job, error) {
 	return job.ToDto(), nil
 }
 
-func (repo JobRepository) Edit(job dtos.Job) error {
-	jobDoc := mongoModels.Job{}
-	jobDoc.FromDto(job)
-
+func (repo JobRepository) Edit(name string, update dtos.JobUpdate) error {
+	updateDoc := mongoModels.JobUpdateFromDto(update)
 	filter := bson.D{{
 		Key:   "_id",
-		Value: job.Name,
+		Value: name,
 	}}
 	coll := repo.DbContext.Db.Collection(JobsCollection)
-	_, err := coll.ReplaceOne(repo.DbContext.Context, filter, jobDoc)
+	_, err := coll.UpdateOne(repo.DbContext.Context, filter, updateDoc)
 	if err != nil {
-		return fmt.Errorf("failed to edit job %s: %s", job.Name, err)
+		return fmt.Errorf("failed to edit job %s: %s", name, err)
 	}
 
 	return nil
@@ -91,30 +88,15 @@ func (repo JobRepository) Add(job dtos.Job) (string, error) {
 	return "", fmt.Errorf("failed to parse id of job: %s", err)
 }
 
-func (repo JobRepository) SetNextRunTime(job dtos.Job) error {
-	elapsed := time.Since(job.NextRunAt)
-
-	if job.Interval <= 0 || elapsed.Milliseconds() <= 0 {
-		return nil
-	}
-
-	intervals := (elapsed.Milliseconds() / int64(job.Interval)) + 1
-	nextRunAt := job.NextRunAt.Add(time.Duration(job.Interval * int(intervals)))
+func (repo JobRepository) Delete(name string) error {
 	filter := bson.D{{
 		Key:   "_id",
-		Value: job.Name,
-	}}
-	update := bson.D{{
-		Key: "$set",
-		Value: bson.D{{
-			Key:   "NextRunAt",
-			Value: nextRunAt.String(),
-		}},
+		Value: name,
 	}}
 	coll := repo.DbContext.Db.Collection(JobsCollection)
-	_, err := coll.UpdateOne(repo.DbContext.Context, filter, update)
+	_, err := coll.DeleteOne(repo.DbContext.Context, filter)
 	if err != nil {
-		return fmt.Errorf("failed to edit job %s: %s", job.Name, err)
+		return fmt.Errorf("failed to delete job %s: %s", name, err)
 	}
 
 	return nil

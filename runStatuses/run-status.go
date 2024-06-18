@@ -1,4 +1,4 @@
-package enums
+package runStatuses
 
 type RunStatus string
 

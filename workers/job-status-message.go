@@ -1,4 +1,4 @@
-package work
+package workers
 
 type JobStatusMessage struct {
 	JobName string `json:"jobName"`

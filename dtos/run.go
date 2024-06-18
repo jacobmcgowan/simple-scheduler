@@ -3,13 +3,13 @@ package dtos
 import (
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/enums"
+	"github.com/jacobmcgowan/simple-scheduler/runStatuses"
 )
 
 type Run struct {
 	Id        string
 	JobName   string
-	Status    enums.RunStatus
+	Status    runStatuses.RunStatus
 	StartTime time.Time
 	EndTime   time.Time
 }

@@ -88,3 +88,17 @@ func (repo RunRepository) Add(run dtos.Run) (string, error) {
 
 	return "", fmt.Errorf("failed to parse id of run: %s", err)
 }
+
+func (repo RunRepository) Delete(name string) error {
+	filter := bson.D{{
+		Key:   "_id",
+		Value: name,
+	}}
+	coll := repo.DbContext.Db.Collection(RunsCollection)
+	_, err := coll.DeleteOne(repo.DbContext.Context, filter)
+	if err != nil {
+		return fmt.Errorf("failed to delete run %s: %s", name, err)
+	}
+
+	return nil
+}

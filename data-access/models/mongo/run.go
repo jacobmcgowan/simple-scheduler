@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/jacobmcgowan/simple-scheduler/dtos"
-	"github.com/jacobmcgowan/simple-scheduler/enums"
+	"github.com/jacobmcgowan/simple-scheduler/runStatuses"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -30,7 +30,7 @@ func (run Run) ToDto() dtos.Run {
 	return dtos.Run{
 		Id:        run.Id.Hex(),
 		JobName:   run.JobName,
-		Status:    enums.RunStatus(run.Status),
+		Status:    runStatuses.RunStatus(run.Status),
 		StartTime: startTime,
 		EndTime:   endTime,
 	}

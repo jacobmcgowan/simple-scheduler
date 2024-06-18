@@ -1,4 +1,4 @@
-package work
+package workers
 
 type MessageBus interface {
 	Connect(connStr string) error
