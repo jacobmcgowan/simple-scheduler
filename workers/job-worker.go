@@ -3,24 +3,25 @@ package workers
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jacobmcgowan/simple-scheduler/common"
 	"github.com/jacobmcgowan/simple-scheduler/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/dtos"
+	messageBus "github.com/jacobmcgowan/simple-scheduler/message-bus"
 	"github.com/jacobmcgowan/simple-scheduler/runStatuses"
 )
 
 type JobWorker struct {
 	Job        dtos.Job
-	Interval   int
-	MessageBus MessageBus
+	MessageBus messageBus.MessageBus
 	JobRepo    repositories.JobRepository
 	RunRepo    repositories.RunRepository
-	running    chan bool
+	quit       chan bool
 }
 
-func (worker JobWorker) Start() error {
+func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 	fullName := "scheduler.job." + worker.Job.Name
 	err := worker.MessageBus.Register(
 		fullName,
@@ -34,22 +35,28 @@ func (worker JobWorker) Start() error {
 	}
 
 	err = worker.MessageBus.Subscribe(
+		wg,
 		"scheduler.job."+worker.Job.Name,
 		"status",
 		"scheduler.job.status",
-		worker.messageReceived,
+		worker.statusMessageReceived,
 	)
 	if err != nil {
 		return err
 	}
 
-	worker.running = make(chan bool)
-	go worker.process()
+	wg.Add(1)
+	worker.quit = make(chan bool)
+	go worker.process(wg)
 
 	return nil
 }
 
-func (worker JobWorker) messageReceived(body []byte) bool {
+func (worker JobWorker) Stop() {
+	worker.quit <- true
+}
+
+func (worker JobWorker) statusMessageReceived(body []byte) bool {
 	fmt.Printf("Job status message received: %s", body)
 	return true
 }
@@ -115,16 +122,21 @@ func (worker *JobWorker) startRun() error {
 	return nil
 }
 
-func (worker *JobWorker) process() {
-	for {
-		if <-worker.running {
-			return
-		}
+func (worker *JobWorker) process(wg *sync.WaitGroup) {
+	defer wg.Done()
 
-		if worker.Job.NextRunAt.Compare(time.Now()) >= 0 {
-			if err := worker.startRun(); err != nil {
-				fmt.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
+	for {
+		switch {
+		case <-worker.quit:
+			return
+		default:
+			if worker.Job.NextRunAt.Compare(time.Now()) >= 0 {
+				if err := worker.startRun(); err != nil {
+					fmt.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
+				}
 			}
+
+			time.Sleep(max(0, time.Until(worker.Job.NextRunAt)))
 		}
 	}
 }

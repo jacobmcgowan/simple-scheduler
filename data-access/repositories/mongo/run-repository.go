@@ -18,13 +18,13 @@ type RunRepository struct {
 func (repo RunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 	var runs []dtos.Run
 	filterDoc := mongoModels.RunFilterFromDto(filter)
-	coll := repo.DbContext.Db.Collection(RunsCollection)
-	cur, err := coll.Find(repo.DbContext.Context, filterDoc)
+	coll := repo.DbContext.db.Collection(RunsCollection)
+	cur, err := coll.Find(repo.DbContext.ctx, filterDoc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find runs: %s", err)
 	}
 
-	for cur.Next(repo.DbContext.Context) {
+	for cur.Next(repo.DbContext.ctx) {
 		var run mongoModels.Run
 		err = cur.Decode(&run)
 		if err != nil {
@@ -34,7 +34,7 @@ func (repo RunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 		runs = append(runs, run.ToDto())
 	}
 
-	err = cur.Close(repo.DbContext.Context)
+	err = cur.Close(repo.DbContext.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to close cursor: %s", err)
 	}
@@ -48,8 +48,8 @@ func (repo RunRepository) Read(id string) (dtos.Run, error) {
 		Key:   "_id",
 		Value: id,
 	}}
-	coll := repo.DbContext.Db.Collection(RunsCollection)
-	err := coll.FindOne(repo.DbContext.Context, filter).Decode(&run)
+	coll := repo.DbContext.db.Collection(RunsCollection)
+	err := coll.FindOne(repo.DbContext.ctx, filter).Decode(&run)
 	if err != nil {
 		return dtos.Run{}, fmt.Errorf("failed to find run %s: %s", id, err)
 	}
@@ -63,8 +63,8 @@ func (repo RunRepository) Edit(id string, update dtos.RunUpdate) error {
 		Key:   "_id",
 		Value: id,
 	}}
-	coll := repo.DbContext.Db.Collection(RunsCollection)
-	_, err := coll.UpdateOne(repo.DbContext.Context, filter, updateDoc)
+	coll := repo.DbContext.db.Collection(RunsCollection)
+	_, err := coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
 	if err != nil {
 		return fmt.Errorf("failed to edit run %s: %s", id, err)
 	}
@@ -76,8 +76,8 @@ func (repo RunRepository) Add(run dtos.Run) (string, error) {
 	runDoc := mongoModels.Run{}
 	runDoc.FromDto(run)
 
-	coll := repo.DbContext.Db.Collection(RunsCollection)
-	res, err := coll.InsertOne(repo.DbContext.Context, runDoc)
+	coll := repo.DbContext.db.Collection(RunsCollection)
+	res, err := coll.InsertOne(repo.DbContext.ctx, runDoc)
 	if err != nil {
 		return "", fmt.Errorf("failed to add run: %s", err)
 	}
@@ -94,8 +94,8 @@ func (repo RunRepository) Delete(name string) error {
 		Key:   "_id",
 		Value: name,
 	}}
-	coll := repo.DbContext.Db.Collection(RunsCollection)
-	_, err := coll.DeleteOne(repo.DbContext.Context, filter)
+	coll := repo.DbContext.db.Collection(RunsCollection)
+	_, err := coll.DeleteOne(repo.DbContext.ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to delete run %s: %s", name, err)
 	}

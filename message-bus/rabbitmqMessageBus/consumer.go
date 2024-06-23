@@ -1,7 +1,8 @@
-package messageBus
+package rabbitmqMessageBus
 
 import (
 	"fmt"
+	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -10,11 +11,11 @@ type Consumer struct {
 	Queue           string
 	Connection      *amqp.Connection
 	MessageReceived func(body []byte) bool
-	Subscribed      chan bool
+	quit            chan bool
 }
 
-func (con *Consumer) Subscribe() error {
-	if con.Subscribed != nil {
+func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
+	if con.quit != nil {
 		return nil
 	}
 
@@ -37,19 +38,22 @@ func (con *Consumer) Subscribe() error {
 		return fmt.Errorf("failed to register consumer for queue %s: %s", con.Queue, err)
 	}
 
-	con.Subscribed = make(chan bool)
+	con.quit = make(chan bool)
 
 	go func() {
-		for {
-			if <-con.Subscribed {
-				return
-			}
+		defer wg.Done()
 
-			for msg := range msgs {
-				if con.MessageReceived(msg.Body) {
-					ch.Ack(msg.DeliveryTag, false)
-				} else {
-					ch.Nack(msg.DeliveryTag, false, true)
+		for {
+			switch {
+			case <-con.quit:
+				return
+			default:
+				for msg := range msgs {
+					if con.MessageReceived(msg.Body) {
+						ch.Ack(msg.DeliveryTag, false)
+					} else {
+						ch.Nack(msg.DeliveryTag, false, true)
+					}
 				}
 			}
 		}

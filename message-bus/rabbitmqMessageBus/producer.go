@@ -1,4 +1,4 @@
-package messageBus
+package rabbitmqMessageBus
 
 import (
 	"context"

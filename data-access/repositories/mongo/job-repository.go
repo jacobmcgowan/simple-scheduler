@@ -17,13 +17,13 @@ type JobRepository struct {
 
 func (repo JobRepository) Browse() ([]dtos.Job, error) {
 	var jobs []dtos.Job
-	coll := repo.DbContext.Db.Collection(JobsCollection)
-	cur, err := coll.Find(repo.DbContext.Context, bson.D{})
+	coll := repo.DbContext.db.Collection(JobsCollection)
+	cur, err := coll.Find(repo.DbContext.ctx, bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to find jobs: %s", err)
 	}
 
-	for cur.Next(repo.DbContext.Context) {
+	for cur.Next(repo.DbContext.ctx) {
 		var job mongoModels.Job
 		err = cur.Decode(&job)
 		if err != nil {
@@ -33,7 +33,7 @@ func (repo JobRepository) Browse() ([]dtos.Job, error) {
 		jobs = append(jobs, job.ToDto())
 	}
 
-	err = cur.Close(repo.DbContext.Context)
+	err = cur.Close(repo.DbContext.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to close cursor: %s", err)
 	}
@@ -47,8 +47,8 @@ func (repo JobRepository) Read(name string) (dtos.Job, error) {
 		Key:   "_id",
 		Value: name,
 	}}
-	coll := repo.DbContext.Db.Collection(JobsCollection)
-	err := coll.FindOne(repo.DbContext.Context, filter).Decode(&job)
+	coll := repo.DbContext.db.Collection(JobsCollection)
+	err := coll.FindOne(repo.DbContext.ctx, filter).Decode(&job)
 	if err != nil {
 		return dtos.Job{}, fmt.Errorf("failed to find job %s: %s", name, err)
 	}
@@ -62,8 +62,8 @@ func (repo JobRepository) Edit(name string, update dtos.JobUpdate) error {
 		Key:   "_id",
 		Value: name,
 	}}
-	coll := repo.DbContext.Db.Collection(JobsCollection)
-	_, err := coll.UpdateOne(repo.DbContext.Context, filter, updateDoc)
+	coll := repo.DbContext.db.Collection(JobsCollection)
+	_, err := coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
 	if err != nil {
 		return fmt.Errorf("failed to edit job %s: %s", name, err)
 	}
@@ -75,8 +75,8 @@ func (repo JobRepository) Add(job dtos.Job) (string, error) {
 	jobDoc := mongoModels.Job{}
 	jobDoc.FromDto(job)
 
-	coll := repo.DbContext.Db.Collection(JobsCollection)
-	res, err := coll.InsertOne(repo.DbContext.Context, jobDoc)
+	coll := repo.DbContext.db.Collection(JobsCollection)
+	res, err := coll.InsertOne(repo.DbContext.ctx, jobDoc)
 	if err != nil {
 		return "", fmt.Errorf("failed to add job: %s", err)
 	}
@@ -93,8 +93,8 @@ func (repo JobRepository) Delete(name string) error {
 		Key:   "_id",
 		Value: name,
 	}}
-	coll := repo.DbContext.Db.Collection(JobsCollection)
-	_, err := coll.DeleteOne(repo.DbContext.Context, filter)
+	coll := repo.DbContext.db.Collection(JobsCollection)
+	_, err := coll.DeleteOne(repo.DbContext.ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to delete job %s: %s", name, err)
 	}
