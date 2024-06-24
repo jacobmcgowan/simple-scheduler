@@ -12,7 +12,7 @@ import (
 const JobsCollection = "jobs"
 
 type JobRepository struct {
-	DbContext DbContext
+	DbContext *DbContext
 }
 
 func (repo JobRepository) Browse() ([]dtos.Job, error) {

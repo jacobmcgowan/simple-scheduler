@@ -12,7 +12,7 @@ import (
 const RunsCollection = "runs"
 
 type RunRepository struct {
-	DbContext DbContext
+	DbContext *DbContext
 }
 
 func (repo RunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {

@@ -36,9 +36,7 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 
 	err = worker.MessageBus.Subscribe(
 		wg,
-		"scheduler.job."+worker.Job.Name,
-		"status",
-		"scheduler.job.status",
+		fullName+".status",
 		worker.statusMessageReceived,
 	)
 	if err != nil {
