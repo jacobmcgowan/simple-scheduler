@@ -9,16 +9,17 @@ import (
 )
 
 type MessageBus struct {
-	connection *amqp.Connection
-	consumers  map[string]Consumer
+	ConnectionString string
+	connection       *amqp.Connection
+	consumers        map[string]Consumer
 }
 
-func (msgBus *MessageBus) Connect(connStr string) error {
+func (msgBus *MessageBus) Connect() error {
 	if msgBus.connection != nil {
 		return nil
 	}
 
-	conn, err := amqp.Dial(connStr)
+	conn, err := amqp.Dial(msgBus.ConnectionString)
 	if err != nil {
 		return fmt.Errorf("failed to connect to RabbitMQ: %s", err)
 	}

@@ -9,11 +9,11 @@ import (
 )
 
 type DbContext struct {
+	DbName  string
+	Options options.ClientOptions
 	db      *mongo.Database
 	ctx     context.Context
 	client  *mongo.Client
-	options options.ClientOptions
-	dbName  string
 }
 
 func (dbContext *DbContext) Connect(ctx context.Context) error {
@@ -22,13 +22,13 @@ func (dbContext *DbContext) Connect(ctx context.Context) error {
 	}
 
 	dbContext.ctx = ctx
-	client, err := mongo.Connect(dbContext.ctx, &dbContext.options)
+	client, err := mongo.Connect(dbContext.ctx, &dbContext.Options)
 	if err != nil {
 		return fmt.Errorf("failed to connect to MongoDB: %s", err)
 	}
 
 	dbContext.client = client
-	dbContext.db = dbContext.client.Database(dbContext.dbName)
+	dbContext.db = dbContext.client.Database(dbContext.DbName)
 	return nil
 }
 

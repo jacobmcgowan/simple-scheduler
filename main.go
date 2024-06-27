@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"sync"
 
@@ -15,38 +16,48 @@ import (
 	"github.com/jacobmcgowan/simple-scheduler/message-bus/rabbitmqMessageBus"
 	"github.com/jacobmcgowan/simple-scheduler/workers"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
+	appName := "simple-scheduler"
 	envFilename := ".env"
 	if len(os.Args) > 1 {
 		envFilename = os.Args[1]
 	}
+
+	log.Printf("Starting %s...", appName)
 
 	if err := godotenv.Load(envFilename); err != nil {
 		log.Fatalf("Failed to load environment file, %s", envFilename)
 	}
 
 	ctx := context.Background()
-	dbCtx, jobRepo, runRepo, err := registerRepos()
+	defer ctx.Done()
+
+	dbName, dbCtx, jobRepo, runRepo, err := registerRepos()
 	if err != nil {
 		log.Fatalf("Failed to register repositories: %s", err)
 	}
 
+	log.Printf("Connecting to database %s...", dbName)
 	if err = dbCtx.Connect(ctx); err != nil {
 		log.Fatalf("Failed to connect to database: %s", err)
 	}
 	defer dbCtx.Disconnect()
+	log.Println("Connected to database")
 
-	msgBus, err := registerMessageBus()
+	msgBusName, msgBus, err := registerMessageBus()
 	if err != nil {
 		log.Fatalf("Failed to register message bus: %s", err)
 	}
 
-	if err = msgBus.Connect(os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING")); err != nil {
+	log.Printf("Connecting to message bus %s...", msgBusName)
+	if err = msgBus.Connect(); err != nil {
 		log.Fatalf("Failed to connect to message bus: %s", err)
 	}
 	defer msgBus.Close()
+	log.Println("Connected to message bus")
 
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
@@ -58,15 +69,25 @@ func main() {
 	manager.Start(&wg)
 	defer manager.Stop()
 
+	log.Printf("Started %s", appName)
 	wg.Wait()
 }
 
-func registerRepos() (repositories.DbContext, repositories.JobRepository, repositories.RunRepository, error) {
+func registerRepos() (string, repositories.DbContext, repositories.JobRepository, repositories.RunRepository, error) {
 	dbType := os.Getenv("SIMPLE_SCHEDULER_DB_TYPE")
+	conStr := os.Getenv("SIMPLE_SCHEDULER_DB_CONNECTION_STRING")
+	conStrUrl, err := url.Parse(conStr)
+	if err != nil {
+		return "", nil, nil, nil, fmt.Errorf("connection string invalid: %s", err)
+	}
 
 	switch dbType {
 	case string(dbTypes.MongoDb):
-		dbCtx := mongoRepos.DbContext{}
+		dbName := os.Getenv("SIMPLE_SCHEDULER_DB_NAME")
+		dbCtx := mongoRepos.DbContext{
+			DbName:  dbName,
+			Options: *options.Client().ApplyURI(conStr),
+		}
 		jobRepo := mongoRepos.JobRepository{
 			DbContext: &dbCtx,
 		}
@@ -74,20 +95,27 @@ func registerRepos() (repositories.DbContext, repositories.JobRepository, reposi
 			DbContext: &dbCtx,
 		}
 
-		return &dbCtx, jobRepo, runRepo, nil
+		return dbName + "@" + conStrUrl.Host, &dbCtx, jobRepo, runRepo, nil
 	default:
-		return nil, nil, nil, fmt.Errorf("DB type %s not supported", dbType)
+		return conStrUrl.Host, nil, nil, nil, fmt.Errorf("DB type %s not supported", dbType)
 	}
 }
 
-func registerMessageBus() (messageBus.MessageBus, error) {
+func registerMessageBus() (string, messageBus.MessageBus, error) {
 	msgBusType := os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_TYPE")
+	conStr := os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING")
+	conStrUrl, err := url.Parse(conStr)
+	if err != nil {
+		return "", nil, fmt.Errorf("connection string invalid: %s", err)
+	}
 
 	switch msgBusType {
 	case string(messageBusTypes.RabbitMq):
-		msgBus := rabbitmqMessageBus.MessageBus{}
-		return &msgBus, nil
+		msgBus := rabbitmqMessageBus.MessageBus{
+			ConnectionString: conStr,
+		}
+		return conStrUrl.Host + conStrUrl.Path, &msgBus, nil
 	default:
-		return nil, fmt.Errorf("Message Bus type % not supported", msgBusType)
+		return conStrUrl.Host + conStrUrl.Path, nil, fmt.Errorf("message bus type %s not supported", msgBusType)
 	}
 }

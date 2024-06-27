@@ -3,6 +3,7 @@ package workers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ type JobWorker struct {
 }
 
 func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
+	log.Printf("Starting job %s...", worker.Job.Name)
 	fullName := "scheduler.job." + worker.Job.Name
 	err := worker.MessageBus.Register(
 		fullName,
@@ -40,22 +42,24 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 		worker.statusMessageReceived,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to subscribe to status queue for job %s: %s", worker.Job.Name, err)
 	}
 
 	wg.Add(1)
 	worker.quit = make(chan bool)
 	go worker.process(wg)
 
+	log.Printf("Started job %s", worker.Job.Name)
 	return nil
 }
 
 func (worker JobWorker) Stop() {
+	log.Printf("Stopping job %s...", worker.Job.Name)
 	worker.quit <- true
 }
 
 func (worker JobWorker) statusMessageReceived(body []byte) bool {
-	fmt.Printf("Job status message received: %s", body)
+	log.Printf("Job %s status message received: %s", worker.Job.Name, body)
 	return true
 }
 
@@ -126,15 +130,17 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 	for {
 		switch {
 		case <-worker.quit:
+			log.Printf("Stopped job %s", worker.Job.Name)
 			return
 		default:
 			if worker.Job.NextRunAt.Compare(time.Now()) >= 0 {
+				log.Printf("Starting run for job %s...", worker.Job.Name)
 				if err := worker.startRun(); err != nil {
-					fmt.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
+					log.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
+				} else {
+					log.Printf("Started run for job %s", worker.Job.Name)
 				}
 			}
-
-			time.Sleep(max(0, time.Until(worker.Job.NextRunAt)))
 		}
 	}
 }

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -20,14 +21,17 @@ type ManagerWorker struct {
 }
 
 func (worker ManagerWorker) Start(wg *sync.WaitGroup) {
+	log.Println("Starting job manager...")
 	worker.jobs = make(map[string]JobWorker)
 	worker.nextCacheRefreshTime = time.Now()
 	worker.quit = make(chan bool)
 
 	go worker.process(wg)
+	log.Println("Started job manager")
 }
 
 func (worker ManagerWorker) Stop() {
+	log.Println("Stopping job manager...")
 	worker.quit <- true
 }
 
@@ -67,19 +71,29 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	return nil
 }
 
+func (worker *ManagerWorker) stopAllJobs() {
+	for name, job := range worker.jobs {
+		job.Stop()
+		delete(worker.jobs, name)
+	}
+}
+
 func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 	for {
 		switch {
 		case <-worker.quit:
+			worker.stopAllJobs()
+			log.Println("Stopped job manager")
 			return
 		default:
 			if worker.nextCacheRefreshTime.Compare(time.Now()) >= 0 {
+				log.Println("Refreshing jobs cache...")
 				if err := worker.refreshCache(wg); err != nil {
-					fmt.Printf("Failed to refresh cache: %s", err)
+					log.Printf("Failed to refresh jobs cache: %s", err)
+				} else {
+					log.Printf("Refreshed jobs cache, %d loaded", len(worker.jobs))
 				}
 			}
-
-			time.Sleep(max(0, time.Until(worker.nextCacheRefreshTime)))
 		}
 	}
 }
