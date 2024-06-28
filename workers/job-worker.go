@@ -19,7 +19,7 @@ type JobWorker struct {
 	MessageBus messageBus.MessageBus
 	JobRepo    repositories.JobRepository
 	RunRepo    repositories.RunRepository
-	quit       chan bool
+	quit       chan struct{}
 }
 
 func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
@@ -46,7 +46,7 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 	}
 
 	wg.Add(1)
-	worker.quit = make(chan bool)
+	worker.quit = make(chan struct{})
 	go worker.process(wg)
 
 	log.Printf("Started job %s", worker.Job.Name)
@@ -55,7 +55,7 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 
 func (worker JobWorker) Stop() {
 	log.Printf("Stopping job %s...", worker.Job.Name)
-	worker.quit <- true
+	worker.quit <- struct{}{}
 }
 
 func (worker JobWorker) statusMessageReceived(body []byte) bool {
@@ -128,7 +128,7 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for {
-		switch {
+		select {
 		case <-worker.quit:
 			log.Printf("Stopped job %s", worker.Job.Name)
 			return

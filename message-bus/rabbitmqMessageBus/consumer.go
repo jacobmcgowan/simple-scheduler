@@ -11,7 +11,7 @@ type Consumer struct {
 	Queue           string
 	Connection      *amqp.Connection
 	MessageReceived func(body []byte) bool
-	quit            chan bool
+	quit            chan struct{}
 }
 
 func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
@@ -38,13 +38,14 @@ func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
 		return fmt.Errorf("failed to register consumer for queue %s: %s", con.Queue, err)
 	}
 
-	con.quit = make(chan bool)
+	wg.Add(1)
+	con.quit = make(chan struct{})
 
 	go func() {
 		defer wg.Done()
 
 		for {
-			switch {
+			select {
 			case <-con.quit:
 				return
 			default:
@@ -60,4 +61,8 @@ func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
 	}()
 
 	return nil
+}
+
+func (con *Consumer) Unsubscribe() {
+	con.quit <- struct{}{}
 }

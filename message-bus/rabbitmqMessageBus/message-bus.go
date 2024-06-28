@@ -35,7 +35,7 @@ func (msgBus *MessageBus) Close() error {
 	}
 
 	for _, con := range msgBus.consumers {
-		con.quit <- false
+		con.Unsubscribe()
 	}
 
 	clear(msgBus.consumers)
@@ -149,7 +149,7 @@ func (msgBus *MessageBus) Subscribe(wg *sync.WaitGroup, queue string, received f
 func (msgBus *MessageBus) Unsubscribe(queue string) {
 	con, hasConsumer := msgBus.consumers[queue]
 	if hasConsumer {
-		con.quit <- false
+		con.Unsubscribe()
 		delete(msgBus.consumers, queue)
 	}
 }

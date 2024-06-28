@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	dbTypes "github.com/jacobmcgowan/simple-scheduler/data-access/db-types"
 	"github.com/jacobmcgowan/simple-scheduler/data-access/repositories"
@@ -32,8 +34,8 @@ func main() {
 		log.Fatalf("Failed to load environment file, %s", envFilename)
 	}
 
-	ctx := context.Background()
-	defer ctx.Done()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	dbName, dbCtx, jobRepo, runRepo, err := registerRepos()
 	if err != nil {
@@ -66,10 +68,13 @@ func main() {
 		RunRepo:             runRepo,
 		CacheRefreshMinutes: 5,
 	}
+
 	manager.Start(&wg)
-	defer manager.Stop()
 
 	log.Printf("Started %s", appName)
+
+	<-ctx.Done()
+	manager.Stop()
 	wg.Wait()
 }
 

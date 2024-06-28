@@ -17,22 +17,23 @@ type ManagerWorker struct {
 	CacheRefreshMinutes  int
 	nextCacheRefreshTime time.Time
 	jobs                 map[string]JobWorker
-	quit                 chan bool
+	quit                 chan struct{}
 }
 
 func (worker ManagerWorker) Start(wg *sync.WaitGroup) {
 	log.Println("Starting job manager...")
 	worker.jobs = make(map[string]JobWorker)
 	worker.nextCacheRefreshTime = time.Now()
-	worker.quit = make(chan bool)
+	worker.quit = make(chan struct{})
 
+	wg.Add(1)
 	go worker.process(wg)
 	log.Println("Started job manager")
 }
 
 func (worker ManagerWorker) Stop() {
 	log.Println("Stopping job manager...")
-	worker.quit <- true
+	worker.quit <- struct{}{}
 }
 
 func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
@@ -79,8 +80,10 @@ func (worker *ManagerWorker) stopAllJobs() {
 }
 
 func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for {
-		switch {
+		select {
 		case <-worker.quit:
 			worker.stopAllJobs()
 			log.Println("Stopped job manager")
