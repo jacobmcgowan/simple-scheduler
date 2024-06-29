@@ -20,7 +20,7 @@ type ManagerWorker struct {
 	quit                 chan struct{}
 }
 
-func (worker ManagerWorker) Start(wg *sync.WaitGroup) {
+func (worker *ManagerWorker) Start(wg *sync.WaitGroup) {
 	log.Println("Starting job manager...")
 	worker.jobs = make(map[string]JobWorker)
 	worker.nextCacheRefreshTime = time.Now()
