@@ -9,7 +9,7 @@ import (
 )
 
 type Run struct {
-	Id        primitive.ObjectID `bson:"_id"`
+	Id        primitive.ObjectID `bson:"_id,omitempty"`
 	JobName   string             `bson:"jobName"`
 	Status    string             `bson:"status"`
 	StartTime string             `bson:"startTime"`

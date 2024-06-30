@@ -7,10 +7,13 @@ import (
 )
 
 func RunUpdateFromDto(dto dtos.RunUpdate) bson.D {
-	update := bson.D{}
-	update = common.AppendBson(update, "status", dto.Status)
-	update = common.AppendBson(update, "startTime", dto.StartTime)
-	update = common.AppendBson(update, "endTime", dto.EndTime)
+	setDoc := bson.D{}
+	setDoc = common.AppendBson(setDoc, "status", dto.Status)
+	setDoc = common.AppendBson(setDoc, "startTime", dto.StartTime)
+	setDoc = common.AppendBson(setDoc, "endTime", dto.EndTime)
 
-	return update
+	return bson.D{{
+		Key:   "$set",
+		Value: setDoc,
+	}}
 }

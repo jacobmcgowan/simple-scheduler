@@ -131,10 +131,6 @@ func (worker *JobWorker) startRun() error {
 		return fmt.Errorf("failed to publish run action %s: %s", runId, err)
 	}
 
-	if err = worker.setNextRunTime(); err != nil {
-		return fmt.Errorf("failed to update next run time for job %s: %s", worker.Job.Name, err)
-	}
-
 	return nil
 }
 
@@ -148,10 +144,16 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 			return
 		case <-time.After(time.Until(worker.Job.NextRunAt)):
 			log.Printf("Starting run for job %s...", worker.Job.Name)
+
 			if err := worker.startRun(); err != nil {
 				log.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
 			} else {
 				log.Printf("Started run for job %s", worker.Job.Name)
+			}
+
+			if err := worker.setNextRunTime(); err != nil {
+				log.Printf("Failed to update next run time for job %s: %s", worker.Job.Name, err)
+				worker.Stop()
 			}
 		}
 	}
