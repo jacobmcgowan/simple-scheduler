@@ -15,14 +15,23 @@ import (
 )
 
 type JobWorker struct {
-	Job        dtos.Job
-	MessageBus messageBus.MessageBus
-	JobRepo    repositories.JobRepository
-	RunRepo    repositories.RunRepository
-	quit       chan struct{}
+	Job           dtos.Job
+	MessageBus    messageBus.MessageBus
+	JobRepo       repositories.JobRepository
+	RunRepo       repositories.RunRepository
+	quit          chan struct{}
+	isRunningLock sync.Mutex `default:"sync.Mutex{}"`
+	isRunning     bool
 }
 
 func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
+	worker.isRunningLock.Lock()
+	defer worker.isRunningLock.Unlock()
+
+	if worker.isRunning {
+		return nil
+	}
+
 	log.Printf("Starting job %s...", worker.Job.Name)
 	fullName := "scheduler.job." + worker.Job.Name
 	err := worker.MessageBus.Register(
@@ -48,17 +57,22 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 	wg.Add(1)
 	worker.quit = make(chan struct{})
 	go worker.process(wg)
+	worker.isRunning = true
 
 	log.Printf("Started job %s", worker.Job.Name)
 	return nil
 }
 
-func (worker JobWorker) Stop() {
+func (worker *JobWorker) Stop() {
+	worker.isRunningLock.Lock()
+	defer worker.isRunningLock.Unlock()
+
 	log.Printf("Stopping job %s...", worker.Job.Name)
 	worker.quit <- struct{}{}
+	worker.isRunning = false
 }
 
-func (worker JobWorker) statusMessageReceived(body []byte) bool {
+func (worker *JobWorker) statusMessageReceived(body []byte) bool {
 	log.Printf("Job %s status message received: %s", worker.Job.Name, body)
 	return true
 }
@@ -132,14 +146,12 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 		case <-worker.quit:
 			log.Printf("Stopped job %s", worker.Job.Name)
 			return
-		default:
-			if worker.Job.NextRunAt.Compare(time.Now()) >= 0 {
-				log.Printf("Starting run for job %s...", worker.Job.Name)
-				if err := worker.startRun(); err != nil {
-					log.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
-				} else {
-					log.Printf("Started run for job %s", worker.Job.Name)
-				}
+		case <-time.After(time.Until(worker.Job.NextRunAt)):
+			log.Printf("Starting run for job %s...", worker.Job.Name)
+			if err := worker.startRun(); err != nil {
+				log.Printf("Failed to start run for job %s: %s", worker.Job.Name, err)
+			} else {
+				log.Printf("Started run for job %s", worker.Job.Name)
 			}
 		}
 	}

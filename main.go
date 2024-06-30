@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	dbTypes "github.com/jacobmcgowan/simple-scheduler/data-access/db-types"
 	"github.com/jacobmcgowan/simple-scheduler/data-access/repositories"
@@ -63,10 +64,10 @@ func main() {
 
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
-		MessageBus:          msgBus,
-		JobRepo:             jobRepo,
-		RunRepo:             runRepo,
-		CacheRefreshMinutes: 5,
+		MessageBus:           msgBus,
+		JobRepo:              jobRepo,
+		RunRepo:              runRepo,
+		CacheRefreshDuration: time.Minute * 5,
 	}
 
 	manager.Start(&wg)

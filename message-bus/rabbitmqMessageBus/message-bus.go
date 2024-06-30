@@ -11,7 +11,7 @@ import (
 type MessageBus struct {
 	ConnectionString string
 	connection       *amqp.Connection
-	consumers        map[string]Consumer
+	consumers        map[string]*Consumer
 }
 
 func (msgBus *MessageBus) Connect() error {
@@ -24,7 +24,7 @@ func (msgBus *MessageBus) Connect() error {
 		return fmt.Errorf("failed to connect to RabbitMQ: %s", err)
 	}
 	msgBus.connection = conn
-	msgBus.consumers = make(map[string]Consumer)
+	msgBus.consumers = make(map[string]*Consumer)
 
 	return nil
 }
@@ -141,7 +141,7 @@ func (msgBus *MessageBus) Subscribe(wg *sync.WaitGroup, queue string, received f
 		return fmt.Errorf("failed to subscribe: %s", err)
 	}
 
-	msgBus.consumers[queue] = con
+	msgBus.consumers[queue] = &con
 
 	return nil
 }

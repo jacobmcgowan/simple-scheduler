@@ -15,10 +15,15 @@ type Consumer struct {
 	channel         *amqp.Channel
 	messages        <-chan amqp.Delivery
 	quit            chan struct{}
+	isRunningLock   sync.Mutex `default:"sync.Mutex{}"`
+	isRunning       bool
 }
 
 func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
-	if con.quit != nil {
+	con.isRunningLock.Lock()
+	defer con.isRunningLock.Unlock()
+
+	if con.isRunning {
 		return nil
 	}
 
@@ -48,14 +53,19 @@ func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
 	con.messages = msgs
 
 	go con.consume(wg)
+	con.isRunning = true
 
 	log.Printf("Subscribed to queue %s", con.Queue)
 	return nil
 }
 
-func (con Consumer) Unsubscribe() {
+func (con *Consumer) Unsubscribe() {
+	con.isRunningLock.Lock()
+	defer con.isRunningLock.Unlock()
+
 	log.Printf("Unsubscribing from queue %s...", con.Queue)
 	con.quit <- struct{}{}
+	con.isRunning = false
 }
 
 func (con *Consumer) consume(wg *sync.WaitGroup) {

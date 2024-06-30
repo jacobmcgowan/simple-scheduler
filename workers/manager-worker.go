@@ -14,29 +14,43 @@ type ManagerWorker struct {
 	MessageBus           messageBus.MessageBus
 	JobRepo              repositories.JobRepository
 	RunRepo              repositories.RunRepository
-	CacheRefreshMinutes  int
-	nextCacheRefreshTime time.Time
-	jobs                 map[string]JobWorker
+	CacheRefreshDuration time.Duration
+	nextCacheRefreshAt   time.Time
+	jobs                 map[string]*JobWorker
 	quit                 chan struct{}
+	isRunningLock        sync.Mutex `default:"sync.Mutex{}"`
+	isRunning            bool
 }
 
 func (worker *ManagerWorker) Start(wg *sync.WaitGroup) {
+	worker.isRunningLock.Lock()
+	defer worker.isRunningLock.Unlock()
+
+	if worker.isRunning {
+		return
+	}
+
 	log.Println("Starting job manager...")
-	worker.jobs = make(map[string]JobWorker)
-	worker.nextCacheRefreshTime = time.Now()
+	worker.jobs = make(map[string]*JobWorker)
 	worker.quit = make(chan struct{})
+	worker.nextCacheRefreshAt = time.Now()
 
 	wg.Add(1)
 	go worker.process(wg)
 	log.Println("Started job manager")
 }
 
-func (worker ManagerWorker) Stop() {
+func (worker *ManagerWorker) Stop() {
+	worker.isRunningLock.Lock()
+	defer worker.isRunningLock.Unlock()
+
 	log.Println("Stopping job manager...")
 	worker.quit <- struct{}{}
+	worker.isRunning = false
 }
 
 func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
+	worker.nextCacheRefreshAt = time.Now().Add(worker.CacheRefreshDuration)
 	refreshedJobs := make(map[string]bool)
 	jobs, err := worker.JobRepo.Browse()
 	if err != nil {
@@ -48,7 +62,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 		if found {
 			jobWorker.Job = job
 		} else {
-			worker.jobs[job.Name] = JobWorker{
+			worker.jobs[job.Name] = &JobWorker{
 				Job:        job,
 				MessageBus: worker.MessageBus,
 				JobRepo:    worker.JobRepo,
@@ -88,14 +102,12 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 			worker.stopAllJobs()
 			log.Println("Stopped job manager")
 			return
-		default:
-			if worker.nextCacheRefreshTime.Compare(time.Now()) >= 0 {
-				log.Println("Refreshing jobs cache...")
-				if err := worker.refreshCache(wg); err != nil {
-					log.Printf("Failed to refresh jobs cache: %s", err)
-				} else {
-					log.Printf("Refreshed jobs cache, %d loaded", len(worker.jobs))
-				}
+		case <-time.After(time.Until(worker.nextCacheRefreshAt)):
+			log.Println("Refreshing jobs cache...")
+			if err := worker.refreshCache(wg); err != nil {
+				log.Printf("Failed to refresh jobs cache: %s", err)
+			} else {
+				log.Printf("Refreshed jobs cache, %d loaded", len(worker.jobs))
 			}
 		}
 	}
