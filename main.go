@@ -90,14 +90,14 @@ func registerRepos() (string, repositories.DbContext, repositories.JobRepository
 	switch dbType {
 	case string(dbTypes.MongoDb):
 		dbName := os.Getenv("SIMPLE_SCHEDULER_DB_NAME")
-		dbCtx := mongoRepos.DbContext{
+		dbCtx := mongoRepos.MongoDbContext{
 			DbName:  dbName,
 			Options: *options.Client().ApplyURI(conStr),
 		}
-		jobRepo := mongoRepos.JobRepository{
+		jobRepo := mongoRepos.MongoJobRepository{
 			DbContext: &dbCtx,
 		}
-		runRepo := mongoRepos.RunRepository{
+		runRepo := mongoRepos.MongoRunRepository{
 			DbContext: &dbCtx,
 		}
 
@@ -117,7 +117,7 @@ func registerMessageBus() (string, messageBus.MessageBus, error) {
 
 	switch msgBusType {
 	case string(messageBusTypes.RabbitMq):
-		msgBus := rabbitmqMessageBus.MessageBus{
+		msgBus := rabbitmqMessageBus.RabbitMessageBus{
 			ConnectionString: conStr,
 		}
 		return conStrUrl.Host + conStrUrl.Path, &msgBus, nil

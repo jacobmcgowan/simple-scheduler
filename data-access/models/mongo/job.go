@@ -7,27 +7,22 @@ import (
 )
 
 type Job struct {
-	Name                string `bson:"_id"`
-	Enabled             bool   `bson:"enabled"`
-	NextRunAt           string `bson:"nextRunAt"`
-	Interval            int    `bson:"interval"`
-	RunExecutionTimeout int    `bson:"runExecutionTimeout"`
-	RunStartTimeout     int    `bson:"runStartTimeout"`
-	MaxQueueCount       int    `bson:"maxQueueCount"`
-	AllowConcurrentRuns bool   `bson:"allowConcurrentRuns"`
-	HeartbeatTimeout    int    `bson:"heartbeatTimeout"`
+	Name                string    `bson:"_id"`
+	Enabled             bool      `bson:"enabled"`
+	NextRunAt           time.Time `bson:"nextRunAt"`
+	Interval            int       `bson:"interval"`
+	RunExecutionTimeout int       `bson:"runExecutionTimeout"`
+	RunStartTimeout     int       `bson:"runStartTimeout"`
+	MaxQueueCount       int       `bson:"maxQueueCount"`
+	AllowConcurrentRuns bool      `bson:"allowConcurrentRuns"`
+	HeartbeatTimeout    int       `bson:"heartbeatTimeout"`
 }
 
 func (job Job) ToDto() dtos.Job {
-	nextRunAt, err := time.Parse(time.RFC3339, job.NextRunAt)
-	if err != nil {
-		nextRunAt = time.Time{}
-	}
-
 	return dtos.Job{
 		Name:                job.Name,
 		Enabled:             job.Enabled,
-		NextRunAt:           nextRunAt,
+		NextRunAt:           job.NextRunAt,
 		Interval:            job.Interval,
 		RunExecutionTimeout: job.RunExecutionTimeout,
 		RunStartTimeout:     job.RunStartTimeout,
@@ -40,7 +35,7 @@ func (job Job) ToDto() dtos.Job {
 func (job *Job) FromDto(dto dtos.Job) {
 	job.Name = dto.Name
 	job.Enabled = dto.Enabled
-	job.NextRunAt = dto.NextRunAt.String()
+	job.NextRunAt = dto.NextRunAt
 	job.Interval = dto.Interval
 	job.RunExecutionTimeout = dto.RunExecutionTimeout
 	job.RunStartTimeout = dto.RunStartTimeout

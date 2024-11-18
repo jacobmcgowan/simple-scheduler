@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type DbContext struct {
+type MongoDbContext struct {
 	DbName  string
 	Options options.ClientOptions
 	db      *mongo.Database
@@ -16,7 +16,7 @@ type DbContext struct {
 	client  *mongo.Client
 }
 
-func (dbContext *DbContext) Connect(ctx context.Context) error {
+func (dbContext *MongoDbContext) Connect(ctx context.Context) error {
 	if dbContext.client != nil {
 		return nil
 	}
@@ -32,7 +32,7 @@ func (dbContext *DbContext) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (dbContext *DbContext) Disconnect() error {
+func (dbContext *MongoDbContext) Disconnect() error {
 	if dbContext.client == nil {
 		return nil
 	}

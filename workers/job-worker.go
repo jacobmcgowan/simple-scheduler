@@ -85,7 +85,8 @@ func (worker *JobWorker) setNextRunTime() error {
 	}
 
 	intervals := (elapsed.Milliseconds() / int64(worker.Job.Interval)) + 1
-	nextRunAt := worker.Job.NextRunAt.Add(time.Duration(worker.Job.Interval * int(intervals)))
+	tilNextRun := time.Duration(worker.Job.Interval * int(intervals) * int(time.Millisecond))
+	nextRunAt := worker.Job.NextRunAt.Add(tilNextRun)
 	update := dtos.JobUpdate{
 		NextRunAt: common.Undefinable[time.Time]{
 			Value:   nextRunAt,
@@ -154,6 +155,8 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 			if err := worker.setNextRunTime(); err != nil {
 				log.Printf("Failed to update next run time for job %s: %s", worker.Job.Name, err)
 				worker.Stop()
+			} else {
+				log.Printf("Next run for job %s is at %s", worker.Job.Name, worker.Job.NextRunAt.String())
 			}
 		}
 	}

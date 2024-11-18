@@ -11,11 +11,11 @@ import (
 
 const JobsCollection = "jobs"
 
-type JobRepository struct {
-	DbContext *DbContext
+type MongoJobRepository struct {
+	DbContext *MongoDbContext
 }
 
-func (repo JobRepository) Browse() ([]dtos.Job, error) {
+func (repo MongoJobRepository) Browse() ([]dtos.Job, error) {
 	var jobs []dtos.Job
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	cur, err := coll.Find(repo.DbContext.ctx, bson.D{})
@@ -41,7 +41,7 @@ func (repo JobRepository) Browse() ([]dtos.Job, error) {
 	return jobs, nil
 }
 
-func (repo JobRepository) Read(name string) (dtos.Job, error) {
+func (repo MongoJobRepository) Read(name string) (dtos.Job, error) {
 	var job mongoModels.Job
 	filter := bson.D{{
 		Key:   "_id",
@@ -56,7 +56,7 @@ func (repo JobRepository) Read(name string) (dtos.Job, error) {
 	return job.ToDto(), nil
 }
 
-func (repo JobRepository) Edit(name string, update dtos.JobUpdate) error {
+func (repo MongoJobRepository) Edit(name string, update dtos.JobUpdate) error {
 	updateDoc := mongoModels.JobUpdateFromDto(update)
 	filter := bson.D{{
 		Key:   "_id",
@@ -71,7 +71,7 @@ func (repo JobRepository) Edit(name string, update dtos.JobUpdate) error {
 	return nil
 }
 
-func (repo JobRepository) Add(job dtos.Job) (string, error) {
+func (repo MongoJobRepository) Add(job dtos.Job) (string, error) {
 	jobDoc := mongoModels.Job{}
 	jobDoc.FromDto(job)
 
@@ -88,7 +88,7 @@ func (repo JobRepository) Add(job dtos.Job) (string, error) {
 	return "", fmt.Errorf("failed to parse id of job: %s", err)
 }
 
-func (repo JobRepository) Delete(name string) error {
+func (repo MongoJobRepository) Delete(name string) error {
 	filter := bson.D{{
 		Key:   "_id",
 		Value: name,

@@ -11,11 +11,11 @@ import (
 
 const RunsCollection = "runs"
 
-type RunRepository struct {
-	DbContext *DbContext
+type MongoRunRepository struct {
+	DbContext *MongoDbContext
 }
 
-func (repo RunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
+func (repo MongoRunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 	var runs []dtos.Run
 	filterDoc := mongoModels.RunFilterFromDto(filter)
 	coll := repo.DbContext.db.Collection(RunsCollection)
@@ -42,7 +42,7 @@ func (repo RunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 	return runs, nil
 }
 
-func (repo RunRepository) Read(id string) (dtos.Run, error) {
+func (repo MongoRunRepository) Read(id string) (dtos.Run, error) {
 	var run mongoModels.Run
 	filter := bson.D{{
 		Key:   "_id",
@@ -57,7 +57,7 @@ func (repo RunRepository) Read(id string) (dtos.Run, error) {
 	return run.ToDto(), nil
 }
 
-func (repo RunRepository) Edit(id string, update dtos.RunUpdate) error {
+func (repo MongoRunRepository) Edit(id string, update dtos.RunUpdate) error {
 	updateDoc := mongoModels.RunUpdateFromDto(update)
 	filter := bson.D{{
 		Key:   "_id",
@@ -72,7 +72,7 @@ func (repo RunRepository) Edit(id string, update dtos.RunUpdate) error {
 	return nil
 }
 
-func (repo RunRepository) Add(run dtos.Run) (string, error) {
+func (repo MongoRunRepository) Add(run dtos.Run) (string, error) {
 	runDoc := mongoModels.Run{}
 	runDoc.FromDto(run)
 
@@ -89,7 +89,7 @@ func (repo RunRepository) Add(run dtos.Run) (string, error) {
 	return "", fmt.Errorf("failed to parse id of run: %s", err)
 }
 
-func (repo RunRepository) Delete(name string) error {
+func (repo MongoRunRepository) Delete(name string) error {
 	filter := bson.D{{
 		Key:   "_id",
 		Value: name,

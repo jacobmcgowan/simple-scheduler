@@ -8,13 +8,13 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type MessageBus struct {
+type RabbitMessageBus struct {
 	ConnectionString string
 	connection       *amqp.Connection
 	consumers        map[string]*Consumer
 }
 
-func (msgBus *MessageBus) Connect() error {
+func (msgBus *RabbitMessageBus) Connect() error {
 	if msgBus.connection != nil {
 		return nil
 	}
@@ -29,7 +29,7 @@ func (msgBus *MessageBus) Connect() error {
 	return nil
 }
 
-func (msgBus *MessageBus) Close() error {
+func (msgBus *RabbitMessageBus) Close() error {
 	if msgBus.connection == nil {
 		return nil
 	}
@@ -50,7 +50,7 @@ func (msgBus *MessageBus) Close() error {
 	return nil
 }
 
-func (msgBus MessageBus) Register(exchange string, bindings map[string][]string) error {
+func (msgBus RabbitMessageBus) Register(exchange string, bindings map[string][]string) error {
 	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
@@ -104,7 +104,7 @@ func (msgBus MessageBus) Register(exchange string, bindings map[string][]string)
 	return nil
 }
 
-func (msgBus MessageBus) Publish(exchange string, key string, body []byte) error {
+func (msgBus RabbitMessageBus) Publish(exchange string, key string, body []byte) error {
 	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
@@ -121,7 +121,7 @@ func (msgBus MessageBus) Publish(exchange string, key string, body []byte) error
 	return nil
 }
 
-func (msgBus *MessageBus) Subscribe(wg *sync.WaitGroup, queue string, received func(body []byte) bool) error {
+func (msgBus *RabbitMessageBus) Subscribe(wg *sync.WaitGroup, queue string, received func(body []byte) bool) error {
 	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
@@ -146,7 +146,7 @@ func (msgBus *MessageBus) Subscribe(wg *sync.WaitGroup, queue string, received f
 	return nil
 }
 
-func (msgBus *MessageBus) Unsubscribe(queue string) {
+func (msgBus *RabbitMessageBus) Unsubscribe(queue string) {
 	con, hasConsumer := msgBus.consumers[queue]
 	if hasConsumer {
 		con.Unsubscribe()
