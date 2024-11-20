@@ -35,8 +35,8 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) {
 	worker.quit = make(chan struct{})
 	worker.nextCacheRefreshAt = time.Now()
 
-	wg.Add(1)
 	go worker.process(wg)
+	worker.isRunning = true
 	log.Println("Started job manager")
 }
 
@@ -94,6 +94,7 @@ func (worker *ManagerWorker) stopAllJobs() {
 }
 
 func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
+	wg.Add(1)
 	defer wg.Done()
 
 	for {

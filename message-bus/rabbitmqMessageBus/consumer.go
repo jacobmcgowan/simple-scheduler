@@ -47,7 +47,6 @@ func (con *Consumer) Subscribe(wg *sync.WaitGroup) error {
 		return fmt.Errorf("failed to register consumer for queue %s: %s", con.Queue, err)
 	}
 
-	wg.Add(1)
 	con.quit = make(chan struct{})
 	con.channel = ch
 	con.messages = msgs
@@ -69,6 +68,7 @@ func (con *Consumer) Unsubscribe() {
 }
 
 func (con *Consumer) consume(wg *sync.WaitGroup) {
+	wg.Add(1)
 	defer wg.Done()
 	defer con.channel.Close()
 

@@ -8,4 +8,5 @@ type MessageBus interface {
 	Register(exchange string, bindings map[string][]string) error
 	Publish(exchange string, key string, body []byte) error
 	Subscribe(wg *sync.WaitGroup, queue string, received func(body []byte) bool) error
+	Unsubscribe(queue string)
 }
