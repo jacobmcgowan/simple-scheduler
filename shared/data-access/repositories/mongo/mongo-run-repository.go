@@ -3,8 +3,8 @@ package mongoRepos
 import (
 	"fmt"
 
-	mongoModels "github.com/jacobmcgowan/simple-scheduler/data-access/models/mongo"
-	"github.com/jacobmcgowan/simple-scheduler/dtos"
+	mongoModels "github.com/jacobmcgowan/simple-scheduler/shared/data-access/models/mongo"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )

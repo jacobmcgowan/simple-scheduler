@@ -3,7 +3,7 @@ package mongoModels
 import (
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/dtos"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
 type Job struct {

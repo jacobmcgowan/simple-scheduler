@@ -1,6 +1,6 @@
 package repositories
 
-import "github.com/jacobmcgowan/simple-scheduler/dtos"
+import "github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 
 type RunRepository interface {
 	Browse(filter dtos.RunFilter) ([]dtos.Run, error)

@@ -1,7 +1,7 @@
 package mongoModels
 
 import (
-	"github.com/jacobmcgowan/simple-scheduler/dtos"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

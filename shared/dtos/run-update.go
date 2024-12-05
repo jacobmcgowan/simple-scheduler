@@ -3,8 +3,8 @@ package dtos
 import (
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/common"
-	"github.com/jacobmcgowan/simple-scheduler/runStatuses"
+	"github.com/jacobmcgowan/simple-scheduler/shared/common"
+	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 )
 
 type RunUpdate struct {

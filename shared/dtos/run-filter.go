@@ -1,7 +1,7 @@
 package dtos
 
 import (
-	"github.com/jacobmcgowan/simple-scheduler/common"
+	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 )
 
 type RunFilter struct {

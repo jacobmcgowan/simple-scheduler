@@ -3,8 +3,8 @@ package mongoModels
 import (
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/dtos"
-	"github.com/jacobmcgowan/simple-scheduler/runStatuses"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
+	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

@@ -3,10 +3,9 @@ package mongoRepos
 import (
 	"fmt"
 
-	mongoModels "github.com/jacobmcgowan/simple-scheduler/data-access/models/mongo"
-	"github.com/jacobmcgowan/simple-scheduler/dtos"
+	mongoModels "github.com/jacobmcgowan/simple-scheduler/shared/data-access/models/mongo"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const JobsCollection = "jobs"
@@ -81,8 +80,8 @@ func (repo MongoJobRepository) Add(job dtos.Job) (string, error) {
 		return "", fmt.Errorf("failed to add job: %s", err)
 	}
 
-	if id, ok := res.InsertedID.(primitive.ObjectID); ok {
-		return id.Hex(), nil
+	if name, ok := res.InsertedID.(string); ok {
+		return name, nil
 	}
 
 	return "", fmt.Errorf("failed to parse id of job: %s", err)

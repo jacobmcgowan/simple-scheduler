@@ -3,7 +3,7 @@ package dtos
 import (
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/common"
+	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 )
 
 type JobUpdate struct {

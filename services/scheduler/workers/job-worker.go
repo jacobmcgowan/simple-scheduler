@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/common"
-	"github.com/jacobmcgowan/simple-scheduler/data-access/repositories"
-	"github.com/jacobmcgowan/simple-scheduler/dtos"
-	messageBus "github.com/jacobmcgowan/simple-scheduler/message-bus"
-	"github.com/jacobmcgowan/simple-scheduler/runStatuses"
+	messageBus "github.com/jacobmcgowan/simple-scheduler/services/scheduler/message-bus"
+	"github.com/jacobmcgowan/simple-scheduler/shared/common"
+	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
+	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 )
 
 type JobWorker struct {

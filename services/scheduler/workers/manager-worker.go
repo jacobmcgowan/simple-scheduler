@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/data-access/repositories"
-	messageBus "github.com/jacobmcgowan/simple-scheduler/message-bus"
+	messageBus "github.com/jacobmcgowan/simple-scheduler/services/scheduler/message-bus"
+	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 )
 
 type ManagerWorker struct {
