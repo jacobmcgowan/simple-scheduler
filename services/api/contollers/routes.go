@@ -10,7 +10,7 @@ import (
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
-func RegisterControllers(router *gin.Engine, jobsRepo repositories.JobRepository) {
+func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository) {
 	api := router.Group("/api")
 
 	status := api.Group("/status")
@@ -22,14 +22,14 @@ func RegisterControllers(router *gin.Engine, jobsRepo repositories.JobRepository
 	jobs := api.Group("/jobs")
 	jobs.GET("", func(ctx *gin.Context) {
 		cont := JobsController{
-			jobsRepo: jobsRepo,
+			jobsRepo: jobRepo,
 		}
 		cont.Browse(ctx)
 	})
 	jobs.GET("/:name", func(ctx *gin.Context) {
 		name := ctx.Param("name")
 		cont := JobsController{
-			jobsRepo: jobsRepo,
+			jobsRepo: jobRepo,
 		}
 		cont.Read(ctx, name)
 	})
@@ -43,7 +43,7 @@ func RegisterControllers(router *gin.Engine, jobsRepo repositories.JobRepository
 		}
 
 		cont := JobsController{
-			jobsRepo: jobsRepo,
+			jobsRepo: jobRepo,
 		}
 		cont.Add(ctx, job)
 	})
@@ -66,14 +66,14 @@ func RegisterControllers(router *gin.Engine, jobsRepo repositories.JobRepository
 		}
 
 		cont := JobsController{
-			jobsRepo: jobsRepo,
+			jobsRepo: jobRepo,
 		}
 		cont.Edit(ctx, name, jobUpdate)
 	})
 	jobs.DELETE("/:name", func(ctx *gin.Context) {
 		name := ctx.Param("name")
 		cont := JobsController{
-			jobsRepo: jobsRepo,
+			jobsRepo: jobRepo,
 		}
 		cont.Delete(ctx, name)
 	})
