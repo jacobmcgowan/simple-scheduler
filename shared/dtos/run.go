@@ -7,9 +7,9 @@ import (
 )
 
 type Run struct {
-	Id        string
-	JobName   string
-	Status    runStatuses.RunStatus
-	StartTime time.Time
-	EndTime   time.Time
+	Id        string                `json:"id"`
+	JobName   string                `json:"jobName"`
+	Status    runStatuses.RunStatus `json:"status"`
+	StartTime time.Time             `json:"startTime"`
+	EndTime   time.Time             `json:"endTime"`
 }

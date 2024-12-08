@@ -29,7 +29,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	dbName, dbCtx, jobRepo, _, err := resources.RegisterRepos()
+	dbName, dbCtx, jobRepo, runRepo, err := resources.RegisterRepos()
 	if err != nil {
 		log.Fatalf("Failed to register repositories: %s", err)
 	}
@@ -43,7 +43,7 @@ func main() {
 
 	router := gin.Default()
 
-	controllers.RegisterControllers(router, jobRepo)
+	controllers.RegisterControllers(router, jobRepo, runRepo)
 
 	router.Run()
 }

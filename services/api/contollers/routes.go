@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	jsonPatchMerge "github.com/jacobmcgowan/simple-scheduler/services/api/json-patch-merge"
+	"github.com/jacobmcgowan/simple-scheduler/services/api/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
-func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository) {
+func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository, runRepo repositories.RunRepository) {
 	api := router.Group("/api")
 
 	status := api.Group("/status")
@@ -21,15 +21,15 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository)
 
 	jobs := api.Group("/jobs")
 	jobs.GET("", func(ctx *gin.Context) {
-		cont := JobsController{
-			jobsRepo: jobRepo,
+		cont := JobController{
+			jobRepo: jobRepo,
 		}
 		cont.Browse(ctx)
 	})
 	jobs.GET("/:name", func(ctx *gin.Context) {
 		name := ctx.Param("name")
-		cont := JobsController{
-			jobsRepo: jobRepo,
+		cont := JobController{
+			jobRepo: jobRepo,
 		}
 		cont.Read(ctx, name)
 	})
@@ -42,8 +42,8 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository)
 			return
 		}
 
-		cont := JobsController{
-			jobsRepo: jobRepo,
+		cont := JobController{
+			jobRepo: jobRepo,
 		}
 		cont.Add(ctx, job)
 	})
@@ -57,7 +57,7 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository)
 			return
 		}
 
-		jobUpdate, err := jsonPatchMerge.PatchJobUpdate(jsonData)
+		jobUpdate, err := converters.PatchToJobUpdate(jsonData)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),
@@ -65,16 +65,42 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository)
 			return
 		}
 
-		cont := JobsController{
-			jobsRepo: jobRepo,
+		cont := JobController{
+			jobRepo: jobRepo,
 		}
 		cont.Edit(ctx, name, jobUpdate)
 	})
 	jobs.DELETE("/:name", func(ctx *gin.Context) {
 		name := ctx.Param("name")
-		cont := JobsController{
-			jobsRepo: jobRepo,
+		cont := JobController{
+			jobRepo: jobRepo,
 		}
 		cont.Delete(ctx, name)
+	})
+
+	runs := api.Group("/runs")
+	runs.GET("", func(ctx *gin.Context) {
+		filter := dtos.RunFilter{
+			JobName: converters.ParamToUndefinableString(ctx.Params, "jobName"),
+			Status:  converters.ParamToUndefinableString(ctx.Params, "status"),
+		}
+		cont := RunController{
+			runRepo: runRepo,
+		}
+		cont.Browse(ctx, filter)
+	})
+	runs.GET("/:id", func(ctx *gin.Context) {
+		id := ctx.Param("id")
+		cont := RunController{
+			runRepo: runRepo,
+		}
+		cont.Read(ctx, id)
+	})
+	runs.GET("/:id/cancel", func(ctx *gin.Context) {
+		id := ctx.Param("id")
+		cont := RunController{
+			runRepo: runRepo,
+		}
+		cont.Cancel(ctx, id)
 	})
 }
