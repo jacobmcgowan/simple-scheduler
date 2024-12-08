@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	controllers "github.com/jacobmcgowan/simple-scheduler/services/api/contollers"
@@ -45,5 +47,27 @@ func main() {
 
 	controllers.RegisterControllers(router, jobRepo, runRepo)
 
-	router.Run()
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Listen: %s\n", err)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+	log.Printf("Stopping %s...", appName)
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(stopCtx); err != nil {
+		log.Fatal("Forced to shutdown: ", err)
+	}
+
+	log.Printf("Stopped %s", appName)
 }
