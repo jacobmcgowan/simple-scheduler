@@ -4,9 +4,11 @@ import (
 	"fmt"
 
 	mongoModels "github.com/jacobmcgowan/simple-scheduler/shared/data-access/models/mongo"
+	repositoryErrors "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/errors"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const RunsCollection = "runs"
@@ -51,6 +53,12 @@ func (repo MongoRunRepository) Read(id string) (dtos.Run, error) {
 	coll := repo.DbContext.db.Collection(RunsCollection)
 	err := coll.FindOne(repo.DbContext.ctx, filter).Decode(&run)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return dtos.Run{}, &repositoryErrors.NotFoundError{
+				Message: fmt.Sprintf("failed to find run %s: %s", id, err),
+			}
+		}
+
 		return dtos.Run{}, fmt.Errorf("failed to find run %s: %s", id, err)
 	}
 
@@ -66,6 +74,12 @@ func (repo MongoRunRepository) Edit(id string, update dtos.RunUpdate) error {
 	coll := repo.DbContext.db.Collection(RunsCollection)
 	_, err := coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return &repositoryErrors.NotFoundError{
+				Message: fmt.Sprintf("failed to find run %s: %s", id, err),
+			}
+		}
+
 		return fmt.Errorf("failed to edit run %s: %s", id, err)
 	}
 
@@ -89,15 +103,21 @@ func (repo MongoRunRepository) Add(run dtos.Run) (string, error) {
 	return "", fmt.Errorf("failed to parse id of run: %s", err)
 }
 
-func (repo MongoRunRepository) Delete(name string) error {
+func (repo MongoRunRepository) Delete(id string) error {
 	filter := bson.D{{
 		Key:   "_id",
-		Value: name,
+		Value: id,
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
 	_, err := coll.DeleteOne(repo.DbContext.ctx, filter)
 	if err != nil {
-		return fmt.Errorf("failed to delete run %s: %s", name, err)
+		if err == mongo.ErrNoDocuments {
+			return &repositoryErrors.NotFoundError{
+				Message: fmt.Sprintf("failed to find run %s: %s", id, err),
+			}
+		}
+
+		return fmt.Errorf("failed to delete run %s: %s", id, err)
 	}
 
 	return nil

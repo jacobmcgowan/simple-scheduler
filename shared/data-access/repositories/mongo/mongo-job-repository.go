@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	mongoModels "github.com/jacobmcgowan/simple-scheduler/shared/data-access/models/mongo"
+	repositoryErrors "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/errors"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const JobsCollection = "jobs"
@@ -49,6 +51,12 @@ func (repo MongoJobRepository) Read(name string) (dtos.Job, error) {
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	err := coll.FindOne(repo.DbContext.ctx, filter).Decode(&job)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return dtos.Job{}, &repositoryErrors.NotFoundError{
+				Message: fmt.Sprintf("failed to find job %s: %s", name, err),
+			}
+		}
+
 		return dtos.Job{}, fmt.Errorf("failed to find job %s: %s", name, err)
 	}
 
@@ -64,6 +72,12 @@ func (repo MongoJobRepository) Edit(name string, update dtos.JobUpdate) error {
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	_, err := coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return &repositoryErrors.NotFoundError{
+				Message: fmt.Sprintf("failed to find job %s: %s", name, err),
+			}
+		}
+
 		return fmt.Errorf("failed to edit job %s: %s", name, err)
 	}
 
@@ -95,6 +109,12 @@ func (repo MongoJobRepository) Delete(name string) error {
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	_, err := coll.DeleteOne(repo.DbContext.ctx, filter)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return &repositoryErrors.NotFoundError{
+				Message: fmt.Sprintf("failed to find job %s: %s", name, err),
+			}
+		}
+
 		return fmt.Errorf("failed to delete job %s: %s", name, err)
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	controllers "github.com/jacobmcgowan/simple-scheduler/services/api/contollers"
+	"github.com/jacobmcgowan/simple-scheduler/services/api/middleware"
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
 	"github.com/joho/godotenv"
 )
@@ -44,7 +45,7 @@ func main() {
 	log.Println("Connected to database")
 
 	router := gin.Default()
-
+	router.Use(middleware.ErrorHandler())
 	controllers.RegisterControllers(router, jobRepo, runRepo)
 
 	srv := &http.Server{
