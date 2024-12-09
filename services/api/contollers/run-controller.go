@@ -40,16 +40,13 @@ func (cont RunController) Cancel(ctx *gin.Context, id string) {
 	}
 
 	switch run.Status {
-	case runStatuses.Cancelled:
-	case runStatuses.Cancelling:
+	case runStatuses.Cancelled, runStatuses.Cancelling:
 		ctx.Status(http.StatusNoContent)
-	case runStatuses.Completed:
-	case runStatuses.Failed:
+	case runStatuses.Completed, runStatuses.Failed:
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error": "Run already finished",
 		})
-	case runStatuses.Pending:
-	case runStatuses.Running:
+	case runStatuses.Pending, runStatuses.Running:
 		runUpdate := dtos.RunUpdate{
 			Status: common.Undefinable[runStatuses.RunStatus]{
 				Value:   runStatuses.Cancelling,

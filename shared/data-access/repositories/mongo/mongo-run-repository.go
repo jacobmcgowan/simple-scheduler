@@ -45,13 +45,20 @@ func (repo MongoRunRepository) Browse(filter dtos.RunFilter) ([]dtos.Run, error)
 }
 
 func (repo MongoRunRepository) Read(id string) (dtos.Run, error) {
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return dtos.Run{}, &repositoryErrors.InvalidIdError{
+			Value: id,
+		}
+	}
+
 	var run mongoModels.Run
 	filter := bson.D{{
 		Key:   "_id",
-		Value: id,
+		Value: objId,
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
-	err := coll.FindOne(repo.DbContext.ctx, filter).Decode(&run)
+	err = coll.FindOne(repo.DbContext.ctx, filter).Decode(&run)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return dtos.Run{}, &repositoryErrors.NotFoundError{
@@ -66,13 +73,20 @@ func (repo MongoRunRepository) Read(id string) (dtos.Run, error) {
 }
 
 func (repo MongoRunRepository) Edit(id string, update dtos.RunUpdate) error {
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return &repositoryErrors.InvalidIdError{
+			Value: id,
+		}
+	}
+
 	updateDoc := mongoModels.RunUpdateFromDto(update)
 	filter := bson.D{{
 		Key:   "_id",
-		Value: id,
+		Value: objId,
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
-	_, err := coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
+	_, err = coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return &repositoryErrors.NotFoundError{
@@ -104,12 +118,19 @@ func (repo MongoRunRepository) Add(run dtos.Run) (string, error) {
 }
 
 func (repo MongoRunRepository) Delete(id string) error {
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return &repositoryErrors.InvalidIdError{
+			Value: id,
+		}
+	}
+
 	filter := bson.D{{
 		Key:   "_id",
-		Value: id,
+		Value: objId,
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
-	_, err := coll.DeleteOne(repo.DbContext.ctx, filter)
+	_, err = coll.DeleteOne(repo.DbContext.ctx, filter)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return &repositoryErrors.NotFoundError{
