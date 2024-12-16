@@ -6,8 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jacobmcgowan/simple-scheduler/services/api/converters"
+	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
+	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
+	"github.com/jacobmcgowan/simple-scheduler/shared/validators"
 )
 
 func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository, runRepo repositories.RunRepository) {
@@ -80,9 +83,19 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository,
 
 	runs := api.Group("/runs")
 	runs.GET("", func(ctx *gin.Context) {
+		status := converters.ParamToUndefinableString(ctx.Params, "status")
+		if status.Defined && !validators.ValidateRunStatus(status.Value, true) {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"status": "Invalid run status",
+			})
+		}
+
 		filter := dtos.RunFilter{
 			JobName: converters.ParamToUndefinableString(ctx.Params, "jobName"),
-			Status:  converters.ParamToUndefinableString(ctx.Params, "status"),
+			Status: common.Undefinable[runStatuses.RunStatus]{
+				Value:   runStatuses.RunStatus(status.Value),
+				Defined: status.Defined && status.Value != "",
+			},
 		}
 		cont := RunController{
 			runRepo: runRepo,
