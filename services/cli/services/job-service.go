@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -55,4 +56,31 @@ func (srv JobService) Read(name string) (dtos.Job, error) {
 	}
 
 	return job, nil
+}
+
+func (svc JobService) Add(job dtos.Job) (string, error) {
+	url := fmt.Sprintf("%s/jobs", svc.ApiUrl)
+	reqBody, err := json.Marshal(job)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var addedJob dtos.Job
+	err = json.Unmarshal(respBody, &addedJob)
+	if err != nil {
+		return "", err
+	}
+
+	return addedJob.Name, nil
 }
