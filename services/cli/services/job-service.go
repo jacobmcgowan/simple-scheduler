@@ -1,11 +1,13 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/jacobmcgowan/simple-scheduler/shared/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
@@ -55,4 +57,62 @@ func (srv JobService) Read(name string) (dtos.Job, error) {
 	}
 
 	return job, nil
+}
+
+func (svc JobService) Add(job dtos.Job) (string, error) {
+	url := fmt.Sprintf("%s/jobs", svc.ApiUrl)
+	reqBody, err := json.Marshal(job)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var addedJob dtos.Job
+	err = json.Unmarshal(respBody, &addedJob)
+	if err != nil {
+		return "", err
+	}
+
+	return addedJob.Name, nil
+}
+
+func (svc JobService) Edit(name string, jobUpdate dtos.JobUpdate) error {
+	url := fmt.Sprintf("%s/jobs/%s", svc.ApiUrl, name)
+	reqBody, err := converters.JobUpdateToPatch(jobUpdate)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }
