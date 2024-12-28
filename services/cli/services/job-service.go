@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/jacobmcgowan/simple-scheduler/shared/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
@@ -71,6 +72,10 @@ func (svc JobService) Add(job dtos.Job) (string, error) {
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -83,4 +88,31 @@ func (svc JobService) Add(job dtos.Job) (string, error) {
 	}
 
 	return addedJob.Name, nil
+}
+
+func (svc JobService) Edit(name string, jobUpdate dtos.JobUpdate) error {
+	url := fmt.Sprintf("%s/jobs/%s", svc.ApiUrl, name)
+	reqBody, err := converters.JobUpdateToPatch(jobUpdate)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }

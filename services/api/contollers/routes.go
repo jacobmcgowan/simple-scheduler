@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jacobmcgowan/simple-scheduler/services/api/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/common"
+	sharedConverters "github.com/jacobmcgowan/simple-scheduler/shared/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
@@ -60,7 +61,7 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository,
 			return
 		}
 
-		jobUpdate, err := converters.PatchToJobUpdate(jsonData)
+		jobUpdate, err := sharedConverters.PatchToJobUpdate(jsonData)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),

@@ -39,7 +39,7 @@ func (cont JobController) Edit(ctx *gin.Context, name string, jobUpdate dtos.Job
 
 func (cont JobController) Add(ctx *gin.Context, job dtos.Job) {
 	if name, err := cont.jobRepo.Add(job); err == nil {
-		ctx.JSON(http.StatusOK, gin.H{
+		ctx.JSON(http.StatusCreated, gin.H{
 			"name": name,
 		})
 	} else {
