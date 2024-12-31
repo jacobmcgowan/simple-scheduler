@@ -34,6 +34,12 @@ go build .
 ./scheduler
 ```
 
+or run in Docker
+```bash
+docker build -f ./services/api/Dockerfile -t simple-scheduler/api .
+docker run -it --rm --name simple-scheduler-api -p 8080:8080 simple-scheduler/api:latest
+```
+
 ### API
 This service provides a RESTful API to get details about and manage jobs.
 
