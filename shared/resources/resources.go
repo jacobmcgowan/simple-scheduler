@@ -5,12 +5,12 @@ import (
 	"net/url"
 	"os"
 
-	messageBus "github.com/jacobmcgowan/simple-scheduler/services/scheduler/message-bus"
-	messageBusTypes "github.com/jacobmcgowan/simple-scheduler/services/scheduler/message-bus/message-bus-types"
-	"github.com/jacobmcgowan/simple-scheduler/services/scheduler/message-bus/rabbitmqMessageBus"
 	dbTypes "github.com/jacobmcgowan/simple-scheduler/shared/data-access/db-types"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	mongoRepos "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/mongo"
+	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
+	messageBusTypes "github.com/jacobmcgowan/simple-scheduler/shared/message-bus/message-bus-types"
+	"github.com/jacobmcgowan/simple-scheduler/shared/message-bus/rabbitmqMessageBus"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
