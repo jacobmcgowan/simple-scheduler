@@ -36,8 +36,8 @@ go build .
 
 or run in Docker
 ```bash
-docker build -f ./services/api/Dockerfile -t simple-scheduler/api .
-docker run -it --rm --name simple-scheduler-api -p 8080:8080 simple-scheduler/api:latest
+docker build -f ./services/api/Dockerfile -t simple-scheduler/scheduler .
+docker run -it --rm --name simple-scheduler -p 8080:8080 simple-scheduler/scheduler:latest
 ```
 
 ### API
@@ -52,6 +52,12 @@ Once the dependencies are running, simply run
 cd services/api
 go build .
 ./api
+```
+
+or run in Docker
+```bash
+docker build -f ./services/api/Dockerfile -t simple-scheduler/api .
+docker run -it --rm --name simple-scheduler-api -p 8080:8080 simple-scheduler/api:latest
 ```
 
 ### CLI

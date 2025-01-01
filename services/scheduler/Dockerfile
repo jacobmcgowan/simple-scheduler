@@ -1,11 +1,16 @@
-FROM golang:1.22
-
-WORKDIR /usr/src/app
+FROM golang:1.22 AS build
+WORKDIR /src
 
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
-COPY . .
-RUN go build -v -o /usr/local/bin/app ./...
+COPY ./shared/ ./shared/
+COPY ./services/scheduler/ ./services/scheduler/
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o scheduler ./services/scheduler/main.go
 
-CMD ["app"]
+FROM scratch
+WORKDIR /app
+
+COPY --from=build /src/scheduler ./
+COPY --from=build /src/services/scheduler/docker.env ./.env
+ENTRYPOINT ["./scheduler"]
