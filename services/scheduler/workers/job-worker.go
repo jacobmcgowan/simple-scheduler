@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	messageBus "github.com/jacobmcgowan/simple-scheduler/services/scheduler/message-bus"
 	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
+	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 )
 

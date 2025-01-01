@@ -49,7 +49,7 @@ func main() {
 	controllers.RegisterControllers(router, jobRepo, runRepo)
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    os.Getenv("SIMPLE_SCHEDULER_API_URL"),
 		Handler: router,
 	}
 
