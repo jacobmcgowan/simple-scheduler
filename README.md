@@ -1,4 +1,8 @@
 # Simple Scheduler
+
+[![Build and Test Status](https://github.com/jacobmcgowan/simple-scheduler/actions/workflows/go-build-test.yml/badge.svg)](https://github.com/jacobmcgowan/simple-scheduler/actions/workflows/go-build-test.yml)
+[![License: MIT](https://cdn.prod.website-files.com/5e0f1144930a8bc8aace526c/65dd9eb5aaca434fac4f1c34_License-MIT-blue.svg)](/LICENSE)
+
 Simple service to schedule jobs to run at specific times or in intervals
 
 ## Services
