@@ -10,15 +10,21 @@ func RunFilterFromDto(dto dtos.RunFilter) bson.D {
 
 	if dto.JobName.Defined {
 		filter = append(filter, bson.E{
-			Key:   "jobName",
-			Value: dto.JobName.Value,
+			Key: "jobName",
+			Value: bson.D{{
+				Key:   "$eq",
+				Value: dto.JobName.Value,
+			}},
 		})
 	}
 
 	if dto.Status.Defined {
 		filter = append(filter, bson.E{
-			Key:   "status",
-			Value: dto.Status.Value,
+			Key: "status",
+			Value: bson.D{{
+				Key:   "$eq",
+				Value: dto.Status.Value,
+			}},
 		})
 	}
 

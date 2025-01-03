@@ -54,8 +54,11 @@ func (repo MongoRunRepository) Read(id string) (dtos.Run, error) {
 
 	var run mongoModels.Run
 	filter := bson.D{{
-		Key:   "_id",
-		Value: objId,
+		Key: "_id",
+		Value: bson.D{{
+			Key:   "$eq",
+			Value: objId,
+		}},
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
 	err = coll.FindOne(repo.DbContext.ctx, filter).Decode(&run)
@@ -82,8 +85,11 @@ func (repo MongoRunRepository) Edit(id string, update dtos.RunUpdate) error {
 
 	updateDoc := mongoModels.RunUpdateFromDto(update)
 	filter := bson.D{{
-		Key:   "_id",
-		Value: objId,
+		Key: "_id",
+		Value: bson.D{{
+			Key:   "$eq",
+			Value: objId,
+		}},
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
 	_, err = coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
@@ -126,8 +132,11 @@ func (repo MongoRunRepository) Delete(id string) error {
 	}
 
 	filter := bson.D{{
-		Key:   "_id",
-		Value: objId,
+		Key: "_id",
+		Value: bson.D{{
+			Key:   "$eq",
+			Value: objId,
+		}},
 	}}
 	coll := repo.DbContext.db.Collection(RunsCollection)
 	_, err = coll.DeleteOne(repo.DbContext.ctx, filter)

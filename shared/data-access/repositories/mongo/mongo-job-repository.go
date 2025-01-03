@@ -45,8 +45,11 @@ func (repo MongoJobRepository) Browse() ([]dtos.Job, error) {
 func (repo MongoJobRepository) Read(name string) (dtos.Job, error) {
 	var job mongoModels.Job
 	filter := bson.D{{
-		Key:   "_id",
-		Value: name,
+		Key: "_id",
+		Value: bson.D{{
+			Key:   "$eq",
+			Value: name,
+		}},
 	}}
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	err := coll.FindOne(repo.DbContext.ctx, filter).Decode(&job)
@@ -66,8 +69,11 @@ func (repo MongoJobRepository) Read(name string) (dtos.Job, error) {
 func (repo MongoJobRepository) Edit(name string, update dtos.JobUpdate) error {
 	updateDoc := mongoModels.JobUpdateFromDto(update)
 	filter := bson.D{{
-		Key:   "_id",
-		Value: name,
+		Key: "_id",
+		Value: bson.D{{
+			Key:   "$eq",
+			Value: name,
+		}},
 	}}
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	_, err := coll.UpdateOne(repo.DbContext.ctx, filter, updateDoc)
@@ -103,8 +109,11 @@ func (repo MongoJobRepository) Add(job dtos.Job) (string, error) {
 
 func (repo MongoJobRepository) Delete(name string) error {
 	filter := bson.D{{
-		Key:   "_id",
-		Value: name,
+		Key: "_id",
+		Value: bson.D{{
+			Key:   "$eq",
+			Value: name,
+		}},
 	}}
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	_, err := coll.DeleteOne(repo.DbContext.ctx, filter)
