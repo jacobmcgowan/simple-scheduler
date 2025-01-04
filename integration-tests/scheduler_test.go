@@ -64,7 +64,6 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	_, msgBus, err := resources.RegisterMessageBus()
 	require.NoError(t, err)
 
-	time.Sleep(time.Second) // Give a second for the message bus to start
 	err = msgBus.Connect()
 	require.NoError(t, err)
 	defer msgBus.Close()

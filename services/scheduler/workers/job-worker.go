@@ -76,9 +76,27 @@ func (worker *JobWorker) Stop() {
 	worker.isRunning = false
 }
 
-func (worker *JobWorker) statusMessageReceived(body []byte) bool {
+func (worker *JobWorker) statusMessageReceived(body []byte) (error, bool) {
 	log.Printf("Job %s status message received: %s", worker.Job.Name, body)
-	return true
+	var statusMsg dtos.JobStatusMessage
+	if err := json.Unmarshal(body, &statusMsg); err != nil {
+		return fmt.Errorf("failed to deserialize status message for job %s: %s", worker.Job.Name, err), false
+	}
+
+	status := runStatuses.RunStatus(statusMsg.Status)
+	switch status {
+	case runStatuses.Cancelled,
+		runStatuses.Cancelling,
+		runStatuses.Completed,
+		runStatuses.Failed,
+		runStatuses.Pending,
+		runStatuses.Running:
+		worker.updateRunStatus(statusMsg.RunId, status)
+	default:
+		return fmt.Errorf("unsupported status %s for job %s", status, worker.Job.Name), false
+	}
+
+	return nil, false
 }
 
 func (worker *JobWorker) setNextRunTime() error {
@@ -118,7 +136,7 @@ func (worker *JobWorker) startRun() error {
 		return fmt.Errorf("failed to add run for job %s: %s", worker.Job.Name, err)
 	}
 
-	body, err := json.Marshal(JobActionMessage{
+	body, err := json.Marshal(dtos.JobActionMessage{
 		JobName: worker.Job.Name,
 		RunId:   runId,
 		Action:  "run",
@@ -134,6 +152,27 @@ func (worker *JobWorker) startRun() error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to publish run action %s: %s", runId, err)
+	}
+
+	return nil
+}
+
+func (worker *JobWorker) updateRunStatus(runId string, status runStatuses.RunStatus) error {
+	runUpdate := dtos.RunUpdate{
+		Status: common.Undefinable[runStatuses.RunStatus]{
+			Value:   status,
+			Defined: true,
+		},
+		EndTime: common.Undefinable[time.Time]{
+			Value: time.Now(),
+			Defined: status == runStatuses.Completed ||
+				status == runStatuses.Failed ||
+				status == runStatuses.Cancelled,
+		},
+	}
+
+	if err := worker.RunRepo.Edit(runId, runUpdate); err != nil {
+		return fmt.Errorf("failed to edit run %s for job %s: %s", runId, worker.Job.Name, err)
 	}
 
 	return nil
