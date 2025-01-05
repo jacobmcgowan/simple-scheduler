@@ -11,7 +11,7 @@ import (
 type Consumer struct {
 	Queue           string
 	Connection      *amqp.Connection
-	MessageReceived func(body []byte) bool
+	MessageReceived func(body []byte) (error, bool)
 	channel         *amqp.Channel
 	messages        <-chan amqp.Delivery
 	quit            chan struct{}
@@ -74,10 +74,12 @@ func (con *Consumer) consume(wg *sync.WaitGroup) {
 
 	go func() {
 		for msg := range con.messages {
-			if con.MessageReceived(msg.Body) {
+			if err, requeue := con.MessageReceived(msg.Body); err == nil {
+				log.Printf("Processed message %s from queue %s", msg.Body, con.Queue)
 				con.channel.Ack(msg.DeliveryTag, false)
 			} else {
-				con.channel.Nack(msg.DeliveryTag, false, true)
+				log.Printf("Failed to process message %s from queue %s: %s", msg.Body, con.Queue, err)
+				con.channel.Nack(msg.DeliveryTag, false, requeue)
 			}
 		}
 	}()

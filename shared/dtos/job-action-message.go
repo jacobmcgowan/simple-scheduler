@@ -1,4 +1,4 @@
-package workers
+package dtos
 
 type JobActionMessage struct {
 	JobName string `json:"jobName"`
