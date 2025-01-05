@@ -70,6 +70,10 @@ func (worker *JobWorker) Stop() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
 
+	if !worker.isRunning {
+		return
+	}
+
 	log.Printf("Stopping job %s...", worker.Job.Name)
 	worker.MessageBus.Unsubscribe(worker.statusQueue)
 	worker.quit <- struct{}{}
@@ -127,9 +131,9 @@ func (worker *JobWorker) setNextRunTime() error {
 
 func (worker *JobWorker) startRun() error {
 	run := dtos.Run{
-		JobName:   worker.Job.Name,
-		Status:    runStatuses.Pending,
-		StartTime: worker.Job.NextRunAt,
+		JobName:     worker.Job.Name,
+		Status:      runStatuses.Pending,
+		CreatedTime: worker.Job.NextRunAt,
 	}
 	runId, err := worker.RunRepo.Add(run)
 	if err != nil {
@@ -162,6 +166,10 @@ func (worker *JobWorker) updateRunStatus(runId string, status runStatuses.RunSta
 		Status: common.Undefinable[runStatuses.RunStatus]{
 			Value:   status,
 			Defined: true,
+		},
+		StartTime: common.Undefinable[time.Time]{
+			Value:   time.Now(),
+			Defined: status == runStatuses.Running,
 		},
 		EndTime: common.Undefinable[time.Time]{
 			Value: time.Now(),
