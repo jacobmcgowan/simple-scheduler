@@ -121,7 +121,7 @@ func (msgBus RabbitMessageBus) Publish(exchange string, key string, body []byte)
 	return nil
 }
 
-func (msgBus *RabbitMessageBus) Subscribe(wg *sync.WaitGroup, queue string, received func(body []byte) bool) error {
+func (msgBus *RabbitMessageBus) Subscribe(wg *sync.WaitGroup, queue string, received func(body []byte) (error, bool)) error {
 	if msgBus.connection == nil {
 		return errors.New("a connection has not been established")
 	}
