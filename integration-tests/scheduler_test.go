@@ -12,6 +12,7 @@ import (
 	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
+	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 	"github.com/stretchr/testify/require"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -86,11 +87,50 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	}
 	manager.Start(&wg)
 
+	completedRuns := []string{}
+	failedRuns := []string{}
+	client := TestClientWorker{
+		Job:        job,
+		MessageBus: msgBus,
+		RunStarted: func(runId string) {
+			run, err := runRepo.Read(runId)
+			require.NoError(t, err)
+			require.Equal(t, runStatuses.Running, run.Status)
+
+			if len(completedRuns) > len(failedRuns) {
+				failedRuns = append(failedRuns, runId)
+			} else {
+				completedRuns = append(completedRuns, runId)
+			}
+		},
+	}
+	client.Start(&wg)
+
 	time.Sleep(time.Second * 2)
 
 	updatedJob, err := jobRepo.Read(jobName)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, updatedJob.NextRunAt.Unix(), job.NextRunAt.Unix())
+
+	require.Equal(t, 1, len(completedRuns))
+	for _, runId := range completedRuns {
+		err = client.CompleteRun(runId)
+		require.NoError(t, err)
+
+		run, err := runRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Completed, run.Status)
+	}
+
+	require.Equal(t, 1, len(failedRuns))
+	for _, runId := range failedRuns {
+		err = client.FailRun(runId)
+		require.NoError(t, err)
+
+		run, err := runRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Failed, run.Status)
+	}
 
 	runFilter := dtos.RunFilter{
 		JobName: common.Undefinable[string]{
@@ -103,5 +143,6 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	require.Len(t, runs, 2)
 
 	manager.Stop()
+	client.Stop()
 	wg.Wait()
 }
