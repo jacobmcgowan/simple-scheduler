@@ -93,6 +93,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		Job:        job,
 		MessageBus: msgBus,
 		RunStarted: func(runId string) {
+			time.Sleep(time.Millisecond * 50)
 			run, err := runRepo.Read(runId)
 			require.NoError(t, err)
 			require.Equal(t, runStatuses.Running, run.Status)
@@ -117,6 +118,8 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		err = client.CompleteRun(runId)
 		require.NoError(t, err)
 
+		time.Sleep(time.Millisecond * 50)
+
 		run, err := runRepo.Read(runId)
 		require.NoError(t, err)
 		require.Equal(t, runStatuses.Completed, run.Status)
@@ -126,6 +129,8 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	for _, runId := range failedRuns {
 		err = client.FailRun(runId)
 		require.NoError(t, err)
+
+		time.Sleep(time.Millisecond * 50)
 
 		run, err := runRepo.Read(runId)
 		require.NoError(t, err)
