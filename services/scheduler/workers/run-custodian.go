@@ -1,23 +1,26 @@
 package workers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
+	"github.com/jacobmcgowan/simple-scheduler/shared/jobActions"
 	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 )
 
 type RunCustodian struct {
-	Job        dtos.Job
-	MessageBus messageBus.MessageBus
-	RunRepo    repositories.RunRepository
-	Interval
+	Job           dtos.Job
+	MessageBus    messageBus.MessageBus
+	RunRepo       repositories.RunRepository
+	Duration      time.Duration
 	quit          chan struct{}
 	isRunningLock sync.Mutex `default:"sync.Mutex{}"`
 	isRunning     bool
@@ -71,22 +74,46 @@ func (worker *RunCustodian) Stop() {
 
 func (worker *RunCustodian) restartStuckRuns() error {
 	filter := dtos.RunFilter{
-		JobName:         worker.Job.Name,
-		Status:          runStatuses.Running,
-		HeartbeatBefore: time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.HeartbeatTimeout)),
+		JobName: common.Undefinable[string]{
+			Value:   worker.Job.Name,
+			Defined: true,
+		},
+		Status: common.Undefinable[runStatuses.RunStatus]{
+			Value:   runStatuses.Running,
+			Defined: true,
+		},
+		HeartbeatBefore: common.Undefinable[time.Time]{
+			Value:   time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.HeartbeatTimeout)),
+			Defined: true,
+		},
 	}
 	runs, err := worker.RunRepo.Browse(filter)
 	if err != nil {
-		return fmt.Errorf("failed to get runs for job %s: %s", worker.Job.Name, err)
+		return fmt.Errorf("failed to get runs: %s", err)
 	}
 
+	count := 0
+	errs := []error{}
 	for _, run := range runs {
 		runUpdate := dtos.RunUpdate{
-			Status: runStatuses.Pending,
+			Status: common.Undefinable[runStatuses.RunStatus]{
+				Value:   runStatuses.Pending,
+				Defined: true,
+			},
 		}
 		if err := worker.RunRepo.Edit(run.Id, runUpdate); err != nil {
-			return fmt.Errorf("failed to reset run %s for job %s: %s", run.Id, worker.Job.Name, err)
+			errs = append(errs, fmt.Errorf("failed to reset run %s: %s", run.Id, err))
+		} else {
+			count++
 		}
+	}
+
+	if count > 0 {
+		log.Printf("Reset %d stuck runs for job %s", count, worker.Job.Name)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
@@ -94,18 +121,52 @@ func (worker *RunCustodian) restartStuckRuns() error {
 
 func (worker *RunCustodian) cancelRun(runId string) error {
 	runUpdate := dtos.RunUpdate{
-		Status: runStatuses.Cancelling,
+		Status: common.Undefinable[runStatuses.RunStatus]{
+			Value:   runStatuses.Cancelling,
+			Defined: true,
+		},
 	}
 	if err := worker.RunRepo.Edit(runId, runUpdate); err != nil {
-		return fmt.Errorf("failed to cancel run %s for job %s: %s", runId, worker.Job.Name, err)
+		return fmt.Errorf("failed to cancel run %s: %s", runId, err)
 	}
 
-	msg := dtos.RunActionMessage{
+	body, err := json.Marshal(dtos.JobActionMessage{
 		RunId:  runId,
-		Action: runStatuses.Cancel,
+		Action: string(jobActions.Cancel),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to serialize run action %s: %s", runId, err)
 	}
-	if err := worker.MessageBus.Publish(worker.actionQueue, msg); err != nil {
+
+	err = worker.MessageBus.Publish(
+		"scheduler.job."+worker.Job.Name,
+		"action",
+		body,
+	)
+	if err != nil {
 		return fmt.Errorf("failed to publish cancel action for run %s: %s", runId, err)
+	}
+
+	return nil
+}
+
+func (worker *RunCustodian) cancelRuns(runs []dtos.Run, reason string) error {
+	count := 0
+	errs := []error{}
+	for _, run := range runs {
+		if err := worker.cancelRun(run.Id); err != nil {
+			errs = append(errs, err)
+		} else {
+			count++
+		}
+	}
+
+	if count > 0 {
+		log.Printf("Cancelled %d runs for job %s because of %s", count, worker.Job.Name, reason)
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
@@ -113,60 +174,56 @@ func (worker *RunCustodian) cancelRun(runId string) error {
 
 func (worker *RunCustodian) cancelTimeoutPendingRuns() error {
 	filter := dtos.RunFilter{
-		JobName:       worker.Job.Name,
-		Status:        runStatuses.Pending,
-		CreatedBefore: time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunStartTimeout)),
+		JobName: common.Undefinable[string]{
+			Value:   worker.Job.Name,
+			Defined: true,
+		},
+		Status: common.Undefinable[runStatuses.RunStatus]{
+			Value:   runStatuses.Pending,
+			Defined: true,
+		},
+		CreatedBefore: common.Undefinable[time.Time]{
+			Value:   time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunStartTimeout)),
+			Defined: true,
+		},
 	}
 	runs, err := worker.RunRepo.Browse(filter)
 	if err != nil {
-		return fmt.Errorf("failed to get runs for job %s: %s", worker.Job.Name, err)
+		return fmt.Errorf("failed to get runs: %s", err)
 	}
 
-	errs := []error{}
-	for _, run := range runs {
-		if err := worker.cancelRun(run.Id); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) > 0 {
-		return errors.Join(errs)
-	}
-
-	return nil
+	return worker.cancelRuns(runs, "run start timeout")
 }
 
 func (worker *RunCustodian) cancelTimeoutRunningRuns() error {
 	filter := dtos.RunFilter{
-		JobName:       worker.Job.Name,
-		Status:        runStatuses.Running,
-		StartedBefore: time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunExecutionTimeout)),
+		JobName: common.Undefinable[string]{
+			Value:   worker.Job.Name,
+			Defined: true,
+		},
+		Status: common.Undefinable[runStatuses.RunStatus]{
+			Value:   runStatuses.Running,
+			Defined: true,
+		},
+		StartedBefore: common.Undefinable[time.Time]{
+			Value:   time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunExecutionTimeout)),
+			Defined: true,
+		},
 	}
 	runs, err := worker.RunRepo.Browse(filter)
 	if err != nil {
-		return fmt.Errorf("failed to get runs for job %s: %s", worker.Job.Name, err)
+		return fmt.Errorf("failed to get runs: %s", err)
 	}
 
-	errs := []error{}
-	for _, run := range runs {
-		if err := worker.cancelRun(run.Id); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) > 0 {
-		return errors.Join(errs)
-	}
-
-	return nil
+	return worker.cancelRuns(runs, "run execution timeout")
 }
 
 func (worker *RunCustodian) clean() error {
 	restartErr := worker.restartStuckRuns()
-	cancelTimeoutPendingErr := worker.cancelTimeoutPendingRuns()
-	cancelTimeoutRunningErr := worker.cancelTimeoutRunningRuns()
+	pendingErr := worker.cancelTimeoutPendingRuns()
+	runningErr := worker.cancelTimeoutRunningRuns()
 
-	return errors.Join(restartErr, cancelTimeoutPendingErr, cancelTimeoutRunningErr)
+	return errors.Join(restartErr, pendingErr, runningErr)
 }
 
 func (worker *RunCustodian) process(wg *sync.WaitGroup) {
@@ -178,7 +235,7 @@ func (worker *RunCustodian) process(wg *sync.WaitGroup) {
 		case <-worker.quit:
 			log.Printf("Stopped run custodian for job %s", worker.Job.Name)
 			return
-		case <-time.After(time.Duration(int(time.Millisecond) * worker.Interval)):
+		case <-time.After(time.Duration(worker.Duration)):
 			if err := worker.clean(); err != nil {
 				log.Printf("Failed to clean runs for job %s: %s", worker.Job.Name, err)
 			}
