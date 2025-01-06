@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -54,12 +55,23 @@ func main() {
 	defer msgBus.Close()
 	log.Println("Connected to message bus")
 
+	refreshInterval, err := strconv.Atoi(os.Getenv("SIMPLE_SCHEDULER_CACHE_REFRESH_INTERVAL"))
+	if err != nil || refreshInterval < 1 {
+		log.Fatalf("Cache refresh interval invalid")
+	}
+
+	cleanupInterval, err := strconv.Atoi(os.Getenv("SIMPLE_SCHEDULER_CLEANUP_INTERVAL"))
+	if err != nil || cleanupInterval < 1 {
+		log.Fatalf("Cleanup interval invalid")
+	}
+
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
 		MessageBus:           msgBus,
 		JobRepo:              jobRepo,
 		RunRepo:              runRepo,
-		CacheRefreshDuration: time.Minute * 5,
+		CacheRefreshDuration: time.Duration(int(time.Millisecond) * refreshInterval),
+		CleanupDuration:      time.Duration(int(time.Millisecond) * cleanupInterval),
 	}
 
 	manager.Start(&wg)
