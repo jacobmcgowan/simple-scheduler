@@ -14,12 +14,25 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func RegisterRepos() (string, repositories.DbContext, repositories.JobRepository, repositories.RunRepository, error) {
+type DbResources struct {
+	Name    string
+	Context repositories.DbContext
+	JobRepo repositories.JobRepository
+	RunRepo repositories.RunRepository
+}
+
+func RegisterRepos() (DbResources, error) {
 	dbType := os.Getenv("SIMPLE_SCHEDULER_DB_TYPE")
 	conStr := os.Getenv("SIMPLE_SCHEDULER_DB_CONNECTION_STRING")
 	conStrUrl, err := url.Parse(conStr)
 	if err != nil {
-		return "", nil, nil, nil, fmt.Errorf("connection string invalid: %s", err)
+		dbResources := DbResources{
+			Name:    "",
+			Context: nil,
+			JobRepo: nil,
+			RunRepo: nil,
+		}
+		return dbResources, fmt.Errorf("connection string invalid: %s", err)
 	}
 
 	switch dbType {
@@ -36,18 +49,39 @@ func RegisterRepos() (string, repositories.DbContext, repositories.JobRepository
 			DbContext: &dbCtx,
 		}
 
-		return dbName + "@" + conStrUrl.Host, &dbCtx, jobRepo, runRepo, nil
+		dbResources := DbResources{
+			Name:    dbName + "@" + conStrUrl.Host,
+			Context: &dbCtx,
+			JobRepo: jobRepo,
+			RunRepo: runRepo,
+		}
+		return dbResources, nil
 	default:
-		return conStrUrl.Host, nil, nil, nil, fmt.Errorf("DB type %s not supported", dbType)
+		dbResources := DbResources{
+			Name:    conStrUrl.Host,
+			Context: nil,
+			JobRepo: nil,
+			RunRepo: nil,
+		}
+		return dbResources, fmt.Errorf("DB type %s not supported", dbType)
 	}
 }
 
-func RegisterMessageBus() (string, messageBus.MessageBus, error) {
+type MessageBusResources struct {
+	Name       string
+	MessageBus messageBus.MessageBus
+}
+
+func RegisterMessageBus() (MessageBusResources, error) {
 	msgBusType := os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_TYPE")
 	conStr := os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING")
 	conStrUrl, err := url.Parse(conStr)
 	if err != nil {
-		return "", nil, fmt.Errorf("connection string invalid: %s", err)
+		msgBusResources := MessageBusResources{
+			Name:       "",
+			MessageBus: nil,
+		}
+		return msgBusResources, fmt.Errorf("connection string invalid: %s", err)
 	}
 
 	switch msgBusType {
@@ -55,8 +89,16 @@ func RegisterMessageBus() (string, messageBus.MessageBus, error) {
 		msgBus := rabbitmqMessageBus.RabbitMessageBus{
 			ConnectionString: conStr,
 		}
-		return conStrUrl.Host + conStrUrl.Path, &msgBus, nil
+		msgBusResources := MessageBusResources{
+			Name:       conStrUrl.Host + conStrUrl.Path,
+			MessageBus: &msgBus,
+		}
+		return msgBusResources, nil
 	default:
-		return conStrUrl.Host + conStrUrl.Path, nil, fmt.Errorf("message bus type %s not supported", msgBusType)
+		msgBusResources := MessageBusResources{
+			Name:       conStrUrl.Host + conStrUrl.Path,
+			MessageBus: nil,
+		}
+		return msgBusResources, fmt.Errorf("message bus type %s not supported", msgBusType)
 	}
 }

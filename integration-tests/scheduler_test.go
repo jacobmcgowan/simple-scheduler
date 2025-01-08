@@ -20,18 +20,12 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 )
 
-func initTests() {
+func initContainers(t *testing.T, ctx context.Context) (*mongodb.MongoDBContainer, *rabbitmq.RabbitMQContainer) {
 	os.Setenv("SIMPLE_SCHEDULER_DB_TYPE", "mongodb")
 	os.Setenv("SIMPLE_SCHEDULER_MESSAGEBUS_TYPE", "rabbitmq")
 	os.Setenv("SIMPLE_SCHEDULER_DB_NAME", "simpleSchedulerTests")
-}
-
-func TestRecurringJobWithRabbitMQ(t *testing.T) {
-	initTests()
-	ctx := context.Background()
 
 	dbC, err := mongodb.Run(ctx, "mongodb/mongodb-community-server:latest")
-	defer testcontainers.TerminateContainer(dbC)
 	require.NoError(t, err)
 
 	dbHost, err := dbC.Host(ctx)
@@ -47,27 +41,34 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		rabbitmq.WithAdminUsername("guest"),
 		rabbitmq.WithAdminPassword("guest"),
 	)
-	defer testcontainers.TerminateContainer(rabbitC)
 	require.NoError(t, err)
 
 	rabbitConnStr, err := rabbitC.AmqpURL(ctx)
 	require.NoError(t, err)
 	os.Setenv("SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING", rabbitConnStr)
-	fmt.Println(rabbitConnStr)
 
-	_, dbCtx, jobRepo, runRepo, err := resources.RegisterRepos()
+	return dbC, rabbitC
+}
+
+func TestRecurringJobWithRabbitMQ(t *testing.T) {
+	ctx := context.Background()
+	dbC, rabbitC := initContainers(t, ctx)
+	defer testcontainers.TerminateContainer(dbC)
+	defer testcontainers.TerminateContainer(rabbitC)
+
+	dbResources, err := resources.RegisterRepos()
 	require.NoError(t, err)
 
-	err = dbCtx.Connect(ctx)
+	err = dbResources.Context.Connect(ctx)
 	require.NoError(t, err)
-	defer dbCtx.Disconnect()
+	defer dbResources.Context.Disconnect()
 
-	_, msgBus, err := resources.RegisterMessageBus()
+	msgBusResources, err := resources.RegisterMessageBus()
 	require.NoError(t, err)
 
-	err = msgBus.Connect()
+	err = msgBusResources.MessageBus.Connect()
 	require.NoError(t, err)
-	defer msgBus.Close()
+	defer msgBusResources.MessageBus.Close()
 
 	job := dtos.Job{
 		Name:      "Test Job",
@@ -75,14 +76,14 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		NextRunAt: time.Now().Add(time.Second),
 		Interval:  1000,
 	}
-	jobName, err := jobRepo.Add(job)
+	jobName, err := dbResources.JobRepo.Add(job)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
-		MessageBus:           msgBus,
-		JobRepo:              jobRepo,
-		RunRepo:              runRepo,
+		MessageBus:           msgBusResources.MessageBus,
+		JobRepo:              dbResources.JobRepo,
+		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 	}
 	manager.Start(&wg)
@@ -91,10 +92,10 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	failedRuns := []string{}
 	client := TestClientWorker{
 		Job:        job,
-		MessageBus: msgBus,
+		MessageBus: msgBusResources.MessageBus,
 		RunStarted: func(runId string) {
 			time.Sleep(time.Millisecond * 50)
-			run, err := runRepo.Read(runId)
+			run, err := dbResources.RunRepo.Read(runId)
 			require.NoError(t, err)
 			require.Equal(t, runStatuses.Running, run.Status)
 
@@ -109,7 +110,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 
 	time.Sleep(time.Second * 2)
 
-	updatedJob, err := jobRepo.Read(jobName)
+	updatedJob, err := dbResources.JobRepo.Read(jobName)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, updatedJob.NextRunAt.Unix(), job.NextRunAt.Unix())
 
@@ -120,7 +121,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 50)
 
-		run, err := runRepo.Read(runId)
+		run, err := dbResources.RunRepo.Read(runId)
 		require.NoError(t, err)
 		require.Equal(t, runStatuses.Completed, run.Status)
 	}
@@ -132,7 +133,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 50)
 
-		run, err := runRepo.Read(runId)
+		run, err := dbResources.RunRepo.Read(runId)
 		require.NoError(t, err)
 		require.Equal(t, runStatuses.Failed, run.Status)
 	}
@@ -143,7 +144,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 			Defined: true,
 		},
 	}
-	runs, err := runRepo.Browse(runFilter)
+	runs, err := dbResources.RunRepo.Browse(runFilter)
 	require.NoError(t, err)
 	require.Len(t, runs, 2)
 
