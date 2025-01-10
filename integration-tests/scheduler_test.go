@@ -85,6 +85,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
+		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 	}
 	manager.Start(&wg)
 
@@ -147,6 +148,114 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	runs, err := dbResources.RunRepo.Browse(runFilter)
 	require.NoError(t, err)
 	require.Len(t, runs, 2)
+
+	manager.Stop()
+	client.Stop()
+	wg.Wait()
+}
+
+func TestRunCleanupWithRabbitMQ(t *testing.T) {
+	ctx := context.Background()
+	dbC, rabbitC := initContainers(t, ctx)
+	defer testcontainers.TerminateContainer(dbC)
+	defer testcontainers.TerminateContainer(rabbitC)
+
+	dbResources, err := resources.RegisterRepos()
+	require.NoError(t, err)
+
+	err = dbResources.Context.Connect(ctx)
+	require.NoError(t, err)
+	defer dbResources.Context.Disconnect()
+
+	msgBusResources, err := resources.RegisterMessageBus()
+	require.NoError(t, err)
+
+	err = msgBusResources.MessageBus.Connect()
+	require.NoError(t, err)
+	defer msgBusResources.MessageBus.Close()
+
+	job := dtos.Job{
+		Name:                "Test Job",
+		Enabled:             true,
+		NextRunAt:           time.Now().Add(time.Second),
+		Interval:            1000,
+		RunStartTimeout:     1000,
+		RunExecutionTimeout: 1000,
+		HeartbeatTimeout:    1000,
+	}
+	jobName, err := dbResources.JobRepo.Add(job)
+	require.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	manager := workers.ManagerWorker{
+		MessageBus:           msgBusResources.MessageBus,
+		JobRepo:              dbResources.JobRepo,
+		RunRepo:              dbResources.RunRepo,
+		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
+		CleanupDuration:      time.Second,
+	}
+	manager.Start(&wg)
+
+	execExpRuns := []string{}
+	hrtbtExpRuns := []string{}
+	client := TestClientWorker{
+		Job:        job,
+		MessageBus: msgBusResources.MessageBus,
+		RunStarted: func(runId string) {
+			time.Sleep(time.Millisecond * 50)
+			run, err := dbResources.RunRepo.Read(runId)
+			require.NoError(t, err)
+			require.Equal(t, runStatuses.Running, run.Status)
+
+			if len(execExpRuns) > len(hrtbtExpRuns) {
+				hrtbtExpRuns = append(hrtbtExpRuns, runId)
+			} else {
+				execExpRuns = append(execExpRuns, runId)
+			}
+		},
+	}
+	client.Start(&wg)
+	time.Sleep(time.Second * 2) // wait for the client to start a couple runs
+	client.Stop()
+
+	time.Sleep(time.Second)
+
+	require.Equal(t, 1, len(execExpRuns))
+	for _, runId := range execExpRuns {
+		run, err := dbResources.RunRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Cancelling, run.Status)
+	}
+
+	require.Equal(t, 1, len(hrtbtExpRuns))
+	for _, runId := range hrtbtExpRuns {
+		run, err := dbResources.RunRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Pending, run.Status)
+	}
+
+	time.Sleep(time.Second * 2) // wait for a run that the client will not start
+
+	for _, runId := range hrtbtExpRuns {
+		run, err := dbResources.RunRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Cancelling, run.Status)
+	}
+
+	cancelledFilter := dtos.RunFilter{
+		JobName: common.Undefinable[string]{
+			Value:   jobName,
+			Defined: true,
+		},
+		Status: common.Undefinable[runStatuses.RunStatus]{
+			Value:   runStatuses.Cancelling,
+			Defined: true,
+		},
+	}
+	cancelledRuns, err := dbResources.RunRepo.Browse(cancelledFilter)
+	require.NoError(t, err)
+	require.Greater(t, len(cancelledRuns), len(execExpRuns))
+	require.Greater(t, len(cancelledRuns), len(hrtbtExpRuns))
 
 	manager.Stop()
 	client.Stop()

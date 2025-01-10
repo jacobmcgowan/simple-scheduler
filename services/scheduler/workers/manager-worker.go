@@ -73,7 +73,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 			}
 		}
 
-		/*runCustodian, found := worker.custodians[job.Name]
+		runCustodian, found := worker.custodians[job.Name]
 		if found {
 			runCustodian.Job = job
 		} else {
@@ -83,7 +83,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 				RunRepo:    worker.RunRepo,
 				Duration:   worker.CleanupDuration,
 			}
-		}*/
+		}
 
 		refreshedJobs[job.Name] = true
 	}
@@ -98,7 +98,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 		}
 	}
 
-	/*for name, custodian := range worker.custodians {
+	for name, custodian := range worker.custodians {
 		_, refreshed := refreshedJobs[name]
 		if refreshed {
 			custodian.Start(wg)
@@ -106,7 +106,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 			custodian.Stop()
 			delete(worker.custodians, name)
 		}
-	}*/
+	}
 
 	return nil
 }
@@ -117,10 +117,10 @@ func (worker *ManagerWorker) stopAllJobs() {
 		delete(worker.jobs, name)
 	}
 
-	/*for name, custodian := range worker.custodians {
+	for name, custodian := range worker.custodians {
 		custodian.Stop()
 		delete(worker.custodians, name)
-	}*/
+	}
 }
 
 func (worker *ManagerWorker) process(wg *sync.WaitGroup) {

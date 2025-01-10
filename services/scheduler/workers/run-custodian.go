@@ -73,6 +73,10 @@ func (worker *RunCustodian) Stop() {
 }
 
 func (worker *RunCustodian) restartStuckRuns() error {
+	if worker.Job.HeartbeatTimeout <= 0 {
+		return nil
+	}
+
 	filter := dtos.RunFilter{
 		JobName: common.Undefinable[string]{
 			Value:   worker.Job.Name,
@@ -173,6 +177,10 @@ func (worker *RunCustodian) cancelRuns(runs []dtos.Run, reason string) error {
 }
 
 func (worker *RunCustodian) cancelTimeoutPendingRuns() error {
+	if worker.Job.RunStartTimeout <= 0 {
+		return nil
+	}
+
 	filter := dtos.RunFilter{
 		JobName: common.Undefinable[string]{
 			Value:   worker.Job.Name,
@@ -196,6 +204,10 @@ func (worker *RunCustodian) cancelTimeoutPendingRuns() error {
 }
 
 func (worker *RunCustodian) cancelTimeoutRunningRuns() error {
+	if worker.Job.RunExecutionTimeout <= 0 {
+		return nil
+	}
+
 	filter := dtos.RunFilter{
 		JobName: common.Undefinable[string]{
 			Value:   worker.Job.Name,
