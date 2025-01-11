@@ -247,7 +247,7 @@ func (worker *RunCustodian) process(wg *sync.WaitGroup) {
 		case <-worker.quit:
 			log.Printf("Stopped run custodian for job %s", worker.Job.Name)
 			return
-		case <-time.After(time.Duration(worker.Duration)):
+		case <-time.After(worker.Duration):
 			if err := worker.clean(); err != nil {
 				log.Printf("Failed to clean runs for job %s: %s", worker.Job.Name, err)
 			}
