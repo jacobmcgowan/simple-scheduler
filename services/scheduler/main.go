@@ -31,7 +31,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	dbResources, err := resources.RegisterRepos()
+	dbEnv := resources.LoadDbEnv()
+	dbResources, err := resources.RegisterRepos(dbEnv)
 	if err != nil {
 		log.Fatalf("Failed to register repositories: %s", err)
 	}
@@ -43,7 +44,8 @@ func main() {
 	defer dbResources.Context.Disconnect()
 	log.Println("Connected to database")
 
-	msgBusResources, err := resources.RegisterMessageBus()
+	msgBusEnv := resources.LoadMessageBusEnv()
+	msgBusResources, err := resources.RegisterMessageBus(msgBusEnv)
 	if err != nil {
 		log.Fatalf("Failed to register message bus: %s", err)
 	}

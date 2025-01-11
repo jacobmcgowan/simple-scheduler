@@ -3,7 +3,6 @@ package integration_tests
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -20,11 +19,21 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 )
 
-func initContainers(t *testing.T, ctx context.Context) (*mongodb.MongoDBContainer, *rabbitmq.RabbitMQContainer) {
-	os.Setenv("SIMPLE_SCHEDULER_DB_TYPE", "mongodb")
-	os.Setenv("SIMPLE_SCHEDULER_MESSAGEBUS_TYPE", "rabbitmq")
-	os.Setenv("SIMPLE_SCHEDULER_DB_NAME", "simpleSchedulerTests")
+type ContainerResources struct {
+	DbContainer         *mongodb.MongoDBContainer
+	MessageBusContainer *rabbitmq.RabbitMQContainer
+	DbEnv               resources.DbEnv
+	MessageBusEnv       resources.MessageBusEnv
+}
 
+func initContainers(t *testing.T, ctx context.Context) ContainerResources {
+	dbEnv := resources.DbEnv{
+		Type: "mongodb",
+		Name: "simpleSchedulerTests",
+	}
+	msgBusEnv := resources.MessageBusEnv{
+		Type: "rabbitmq",
+	}
 	dbC, err := mongodb.Run(ctx, "mongodb/mongodb-community-server:latest")
 	require.NoError(t, err)
 
@@ -32,8 +41,7 @@ func initContainers(t *testing.T, ctx context.Context) (*mongodb.MongoDBContaine
 	require.NoError(t, err)
 	dbPort, err := dbC.MappedPort(ctx, "27017")
 	require.NoError(t, err)
-	dbConnStr := fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort.Port())
-	os.Setenv("SIMPLE_SCHEDULER_DB_CONNECTION_STRING", dbConnStr)
+	dbEnv.ConnectionString = fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort.Port())
 
 	rabbitC, err := rabbitmq.Run(
 		ctx,
@@ -45,25 +53,32 @@ func initContainers(t *testing.T, ctx context.Context) (*mongodb.MongoDBContaine
 
 	rabbitConnStr, err := rabbitC.AmqpURL(ctx)
 	require.NoError(t, err)
-	os.Setenv("SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING", rabbitConnStr)
+	msgBusEnv.ConnectionString = rabbitConnStr
 
-	return dbC, rabbitC
+	return ContainerResources{
+		DbContainer:         dbC,
+		MessageBusContainer: rabbitC,
+		DbEnv:               dbEnv,
+		MessageBusEnv:       msgBusEnv,
+	}
 }
 
 func TestRecurringJobWithRabbitMQ(t *testing.T) {
-	ctx := context.Background()
-	dbC, rabbitC := initContainers(t, ctx)
-	defer testcontainers.TerminateContainer(dbC)
-	defer testcontainers.TerminateContainer(rabbitC)
+	t.Parallel()
 
-	dbResources, err := resources.RegisterRepos()
+	ctx := context.Background()
+	cRes := initContainers(t, ctx)
+	defer testcontainers.TerminateContainer(cRes.DbContainer)
+	defer testcontainers.TerminateContainer(cRes.MessageBusContainer)
+
+	dbResources, err := resources.RegisterRepos(cRes.DbEnv)
 	require.NoError(t, err)
 
 	err = dbResources.Context.Connect(ctx)
 	require.NoError(t, err)
 	defer dbResources.Context.Disconnect()
 
-	msgBusResources, err := resources.RegisterMessageBus()
+	msgBusResources, err := resources.RegisterMessageBus(cRes.MessageBusEnv)
 	require.NoError(t, err)
 
 	err = msgBusResources.MessageBus.Connect()
@@ -155,19 +170,21 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 }
 
 func TestRunCleanupWithRabbitMQ(t *testing.T) {
-	ctx := context.Background()
-	dbC, rabbitC := initContainers(t, ctx)
-	defer testcontainers.TerminateContainer(dbC)
-	defer testcontainers.TerminateContainer(rabbitC)
+	t.Parallel()
 
-	dbResources, err := resources.RegisterRepos()
+	ctx := context.Background()
+	cRes := initContainers(t, ctx)
+	defer testcontainers.TerminateContainer(cRes.DbContainer)
+	defer testcontainers.TerminateContainer(cRes.MessageBusContainer)
+
+	dbResources, err := resources.RegisterRepos(cRes.DbEnv)
 	require.NoError(t, err)
 
 	err = dbResources.Context.Connect(ctx)
 	require.NoError(t, err)
 	defer dbResources.Context.Disconnect()
 
-	msgBusResources, err := resources.RegisterMessageBus()
+	msgBusResources, err := resources.RegisterMessageBus(cRes.MessageBusEnv)
 	require.NoError(t, err)
 
 	err = msgBusResources.MessageBus.Connect()

@@ -32,7 +32,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	dbResources, err := resources.RegisterRepos()
+	dbEnv := resources.LoadDbEnv()
+	dbResources, err := resources.RegisterRepos(dbEnv)
 	if err != nil {
 		log.Fatalf("Failed to register repositories: %s", err)
 	}
