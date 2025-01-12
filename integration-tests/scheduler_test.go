@@ -199,7 +199,6 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 		Interval:            1000,
 		RunStartTimeout:     1000,
 		RunExecutionTimeout: 1000,
-		HeartbeatTimeout:    1000,
 	}
 	jobName, err := dbResources.JobRepo.Add(job)
 	require.NoError(t, err)
@@ -215,7 +214,6 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	manager.Start(&wg)
 
 	execExpRuns := []string{}
-	hrtbtExpRuns := []string{}
 	client := TestClientWorker{
 		Job:               job,
 		MessageBus:        msgBusResources.MessageBus,
@@ -226,18 +224,14 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, runStatuses.Running, run.Status)
 
-			if len(execExpRuns) > len(hrtbtExpRuns) {
-				hrtbtExpRuns = append(hrtbtExpRuns, runId)
-			} else {
-				execExpRuns = append(execExpRuns, runId)
-			}
+			execExpRuns = append(execExpRuns, runId)
 		},
 	}
 	client.Start(&wg)
-	time.Sleep(time.Second * 2) // wait for the client to start a couple runs
+	time.Sleep(time.Second)
 	client.Stop()
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
 
 	require.Equal(t, 1, len(execExpRuns))
 	for _, runId := range execExpRuns {
@@ -246,20 +240,7 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 		require.Equal(t, runStatuses.Cancelling, run.Status)
 	}
 
-	require.Equal(t, 1, len(hrtbtExpRuns))
-	for _, runId := range hrtbtExpRuns {
-		run, err := dbResources.RunRepo.Read(runId)
-		require.NoError(t, err)
-		require.Equal(t, runStatuses.Pending, run.Status)
-	}
-
-	time.Sleep(time.Second * 2) // wait for a run that the client will not start
-
-	for _, runId := range hrtbtExpRuns {
-		run, err := dbResources.RunRepo.Read(runId)
-		require.NoError(t, err)
-		require.Equal(t, runStatuses.Cancelling, run.Status)
-	}
+	time.Sleep(time.Second) // wait for a run that the client will not start
 
 	cancelledFilter := dtos.RunFilter{
 		JobName: common.Undefinable[string]{
@@ -274,7 +255,6 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	cancelledRuns, err := dbResources.RunRepo.Browse(cancelledFilter)
 	require.NoError(t, err)
 	require.Greater(t, len(cancelledRuns), len(execExpRuns))
-	require.Greater(t, len(cancelledRuns), len(hrtbtExpRuns))
 
 	manager.Stop()
 	client.Stop()

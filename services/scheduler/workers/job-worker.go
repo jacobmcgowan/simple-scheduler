@@ -163,6 +163,7 @@ func (worker *JobWorker) startRun() error {
 		JobName:     worker.Job.Name,
 		Status:      runStatuses.Pending,
 		CreatedTime: worker.Job.NextRunAt,
+		Heartbeat:   worker.Job.NextRunAt,
 	}
 	runId, err := worker.RunRepo.Add(run)
 	if err != nil {
@@ -191,17 +192,22 @@ func (worker *JobWorker) startRun() error {
 }
 
 func (worker *JobWorker) updateRunStatus(runId string, status runStatuses.RunStatus) error {
+	now := time.Now()
 	runUpdate := dtos.RunUpdate{
 		Status: common.Undefinable[runStatuses.RunStatus]{
 			Value:   status,
 			Defined: true,
 		},
 		StartTime: common.Undefinable[time.Time]{
-			Value:   time.Now(),
+			Value:   now,
+			Defined: status == runStatuses.Running,
+		},
+		Heartbeat: common.Undefinable[time.Time]{
+			Value:   now,
 			Defined: status == runStatuses.Running,
 		},
 		EndTime: common.Undefinable[time.Time]{
-			Value: time.Now(),
+			Value: now,
 			Defined: status == runStatuses.Completed ||
 				status == runStatuses.Failed ||
 				status == runStatuses.Cancelled,
