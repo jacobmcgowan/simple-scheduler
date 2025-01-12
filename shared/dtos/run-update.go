@@ -11,4 +11,5 @@ type RunUpdate struct {
 	Status    common.Undefinable[runStatuses.RunStatus]
 	StartTime common.Undefinable[time.Time]
 	EndTime   common.Undefinable[time.Time]
+	Heartbeat common.Undefinable[time.Time]
 }

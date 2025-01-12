@@ -9,20 +9,24 @@ import (
 )
 
 type Run struct {
-	Id        primitive.ObjectID `bson:"_id,omitempty"`
-	JobName   string             `bson:"jobName"`
-	Status    string             `bson:"status"`
-	StartTime time.Time          `bson:"startTime"`
-	EndTime   time.Time          `bson:"endTime"`
+	Id          primitive.ObjectID `bson:"_id,omitempty"`
+	JobName     string             `bson:"jobName"`
+	Status      string             `bson:"status"`
+	CreatedTime time.Time          `bson:"createdTime"`
+	StartTime   time.Time          `bson:"startTime"`
+	EndTime     time.Time          `bson:"endTime"`
+	Heartbeat   time.Time          `bson:"heartbeat"`
 }
 
 func (run Run) ToDto() dtos.Run {
 	return dtos.Run{
-		Id:        run.Id.Hex(),
-		JobName:   run.JobName,
-		Status:    runStatuses.RunStatus(run.Status),
-		StartTime: run.StartTime,
-		EndTime:   run.EndTime,
+		Id:          run.Id.Hex(),
+		JobName:     run.JobName,
+		Status:      runStatuses.RunStatus(run.Status),
+		CreatedTime: run.CreatedTime,
+		StartTime:   run.StartTime,
+		EndTime:     run.EndTime,
+		Heartbeat:   run.Heartbeat,
 	}
 }
 
@@ -35,6 +39,8 @@ func (run *Run) FromDto(dto dtos.Run) {
 	run.Id = id
 	run.JobName = dto.JobName
 	run.Status = string(dto.Status)
+	run.CreatedTime = dto.CreatedTime
 	run.StartTime = dto.StartTime
 	run.EndTime = dto.EndTime
+	run.Heartbeat = dto.Heartbeat
 }

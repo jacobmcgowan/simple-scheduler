@@ -15,15 +15,16 @@ import (
 )
 
 type JobWorker struct {
-	Job           dtos.Job
-	MessageBus    messageBus.MessageBus
-	JobRepo       repositories.JobRepository
-	RunRepo       repositories.RunRepository
-	quit          chan struct{}
-	isRunningLock sync.Mutex `default:"sync.Mutex{}"`
-	isRunning     bool
-	actionQueue   string
-	statusQueue   string
+	Job            dtos.Job
+	MessageBus     messageBus.MessageBus
+	JobRepo        repositories.JobRepository
+	RunRepo        repositories.RunRepository
+	quit           chan struct{}
+	isRunningLock  sync.Mutex `default:"sync.Mutex{}"`
+	isRunning      bool
+	actionQueue    string
+	statusQueue    string
+	heartbeatQueue string
 }
 
 func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
@@ -36,13 +37,15 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 
 	log.Printf("Starting job %s...", worker.Job.Name)
 	fullName := "scheduler.job." + worker.Job.Name
-	worker.statusQueue = fullName + ".status"
 	worker.actionQueue = fullName + ".action"
+	worker.statusQueue = fullName + ".status"
+	worker.heartbeatQueue = fullName + ".heartbeat"
 	err := worker.MessageBus.Register(
 		fullName,
 		map[string][]string{
-			worker.actionQueue: {"action"},
-			worker.statusQueue: {"status"},
+			worker.actionQueue:    {"action"},
+			worker.statusQueue:    {"status"},
+			worker.heartbeatQueue: {"heartbeat"},
 		},
 	)
 	if err != nil {
@@ -58,6 +61,15 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 		return fmt.Errorf("failed to subscribe to status queue for job %s: %s", worker.Job.Name, err)
 	}
 
+	err = worker.MessageBus.Subscribe(
+		wg,
+		worker.heartbeatQueue,
+		worker.heartbeatMessageReceived,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to heartbeat queue for job %s: %s", worker.Job.Name, err)
+	}
+
 	worker.quit = make(chan struct{})
 	go worker.process(wg)
 	worker.isRunning = true
@@ -70,20 +82,25 @@ func (worker *JobWorker) Stop() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
 
+	if !worker.isRunning {
+		return
+	}
+
 	log.Printf("Stopping job %s...", worker.Job.Name)
 	worker.MessageBus.Unsubscribe(worker.statusQueue)
+	worker.MessageBus.Unsubscribe(worker.heartbeatQueue)
 	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
 func (worker *JobWorker) statusMessageReceived(body []byte) (error, bool) {
 	log.Printf("Job %s status message received: %s", worker.Job.Name, body)
-	var statusMsg dtos.JobStatusMessage
-	if err := json.Unmarshal(body, &statusMsg); err != nil {
+	var msg dtos.JobStatusMessage
+	if err := json.Unmarshal(body, &msg); err != nil {
 		return fmt.Errorf("failed to deserialize status message for job %s: %s", worker.Job.Name, err), false
 	}
 
-	status := runStatuses.RunStatus(statusMsg.Status)
+	status := runStatuses.RunStatus(msg.Status)
 	switch status {
 	case runStatuses.Cancelled,
 		runStatuses.Cancelling,
@@ -91,9 +108,25 @@ func (worker *JobWorker) statusMessageReceived(body []byte) (error, bool) {
 		runStatuses.Failed,
 		runStatuses.Pending,
 		runStatuses.Running:
-		worker.updateRunStatus(statusMsg.RunId, status)
+		if err := worker.updateRunStatus(msg.RunId, status); err != nil {
+			return fmt.Errorf("failed to update run %s status to %s: %s", msg.RunId, status, err), true
+		}
 	default:
 		return fmt.Errorf("unsupported status %s for job %s", status, worker.Job.Name), false
+	}
+
+	return nil, false
+}
+
+func (worker *JobWorker) heartbeatMessageReceived(body []byte) (error, bool) {
+	log.Printf("Job %s heartbeat message received: %s", worker.Job.Name, body)
+	var msg dtos.JobHeartbeatMessage
+	if err := json.Unmarshal(body, &msg); err != nil {
+		return fmt.Errorf("failed to deserialize heartbeat message for job %s: %s", worker.Job.Name, err), false
+	}
+
+	if err := worker.updateRunHeartbeat(msg.RunId); err != nil {
+		return fmt.Errorf("failed to update heartbeat for run %s: %s", msg.RunId, err), true
 	}
 
 	return nil, false
@@ -127,9 +160,10 @@ func (worker *JobWorker) setNextRunTime() error {
 
 func (worker *JobWorker) startRun() error {
 	run := dtos.Run{
-		JobName:   worker.Job.Name,
-		Status:    runStatuses.Pending,
-		StartTime: worker.Job.NextRunAt,
+		JobName:     worker.Job.Name,
+		Status:      runStatuses.Pending,
+		CreatedTime: worker.Job.NextRunAt,
+		Heartbeat:   worker.Job.NextRunAt,
 	}
 	runId, err := worker.RunRepo.Add(run)
 	if err != nil {
@@ -158,16 +192,40 @@ func (worker *JobWorker) startRun() error {
 }
 
 func (worker *JobWorker) updateRunStatus(runId string, status runStatuses.RunStatus) error {
+	now := time.Now()
 	runUpdate := dtos.RunUpdate{
 		Status: common.Undefinable[runStatuses.RunStatus]{
 			Value:   status,
 			Defined: true,
 		},
+		StartTime: common.Undefinable[time.Time]{
+			Value:   now,
+			Defined: status == runStatuses.Running,
+		},
+		Heartbeat: common.Undefinable[time.Time]{
+			Value:   now,
+			Defined: status == runStatuses.Running,
+		},
 		EndTime: common.Undefinable[time.Time]{
-			Value: time.Now(),
+			Value: now,
 			Defined: status == runStatuses.Completed ||
 				status == runStatuses.Failed ||
 				status == runStatuses.Cancelled,
+		},
+	}
+
+	if err := worker.RunRepo.Edit(runId, runUpdate); err != nil {
+		return fmt.Errorf("failed to edit run %s for job %s: %s", runId, worker.Job.Name, err)
+	}
+
+	return nil
+}
+
+func (worker *JobWorker) updateRunHeartbeat(runId string) error {
+	runUpdate := dtos.RunUpdate{
+		Heartbeat: common.Undefinable[time.Time]{
+			Value:   time.Now(),
+			Defined: true,
 		},
 	}
 

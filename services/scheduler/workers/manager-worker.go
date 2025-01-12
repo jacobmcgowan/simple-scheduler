@@ -15,8 +15,10 @@ type ManagerWorker struct {
 	JobRepo              repositories.JobRepository
 	RunRepo              repositories.RunRepository
 	CacheRefreshDuration time.Duration
+	CleanupDuration      time.Duration
 	nextCacheRefreshAt   time.Time
 	jobs                 map[string]*JobWorker
+	custodians           map[string]*RunCustodian
 	quit                 chan struct{}
 	isRunningLock        sync.Mutex `default:"sync.Mutex{}"`
 	isRunning            bool
@@ -32,6 +34,7 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) {
 
 	log.Println("Starting job manager...")
 	worker.jobs = make(map[string]*JobWorker)
+	worker.custodians = make(map[string]*RunCustodian)
 	worker.quit = make(chan struct{})
 	worker.nextCacheRefreshAt = time.Now()
 
@@ -70,6 +73,18 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 			}
 		}
 
+		runCustodian, found := worker.custodians[job.Name]
+		if found {
+			runCustodian.Job = job
+		} else {
+			worker.custodians[job.Name] = &RunCustodian{
+				Job:        job,
+				MessageBus: worker.MessageBus,
+				RunRepo:    worker.RunRepo,
+				Duration:   worker.CleanupDuration,
+			}
+		}
+
 		refreshedJobs[job.Name] = true
 	}
 
@@ -77,9 +92,19 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 		_, refreshed := refreshedJobs[name]
 		if refreshed {
 			job.Start(wg)
-		} else if !refreshed {
+		} else {
 			job.Stop()
 			delete(worker.jobs, name)
+		}
+	}
+
+	for name, custodian := range worker.custodians {
+		_, refreshed := refreshedJobs[name]
+		if refreshed {
+			custodian.Start(wg)
+		} else {
+			custodian.Stop()
+			delete(worker.custodians, name)
 		}
 	}
 
@@ -90,6 +115,11 @@ func (worker *ManagerWorker) stopAllJobs() {
 	for name, job := range worker.jobs {
 		job.Stop()
 		delete(worker.jobs, name)
+	}
+
+	for name, custodian := range worker.custodians {
+		custodian.Stop()
+		delete(worker.custodians, name)
 	}
 }
 

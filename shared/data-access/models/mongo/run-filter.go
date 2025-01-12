@@ -28,5 +28,35 @@ func RunFilterFromDto(dto dtos.RunFilter) bson.D {
 		})
 	}
 
+	if dto.CreatedBefore.Defined {
+		filter = append(filter, bson.E{
+			Key: "createdTime",
+			Value: bson.D{{
+				Key:   "$lt",
+				Value: dto.CreatedBefore.Value,
+			}},
+		})
+	}
+
+	if dto.StartedBefore.Defined {
+		filter = append(filter, bson.E{
+			Key: "startTime",
+			Value: bson.D{{
+				Key:   "$lt",
+				Value: dto.StartedBefore.Value,
+			}},
+		})
+	}
+
+	if dto.HeartbeatBefore.Defined {
+		filter = append(filter, bson.E{
+			Key: "heartbeat",
+			Value: bson.D{{
+				Key:   "$lt",
+				Value: dto.HeartbeatBefore.Value,
+			}},
+		})
+	}
+
 	return filter
 }

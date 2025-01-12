@@ -32,21 +32,22 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	dbName, dbCtx, jobRepo, runRepo, err := resources.RegisterRepos()
+	dbEnv := resources.LoadDbEnv()
+	dbResources, err := resources.RegisterRepos(dbEnv)
 	if err != nil {
 		log.Fatalf("Failed to register repositories: %s", err)
 	}
 
-	log.Printf("Connecting to database %s...", dbName)
-	if err = dbCtx.Connect(ctx); err != nil {
+	log.Printf("Connecting to database %s...", dbResources.Name)
+	if err = dbResources.Context.Connect(ctx); err != nil {
 		log.Fatalf("Failed to connect to database: %s", err)
 	}
-	defer dbCtx.Disconnect()
+	defer dbResources.Context.Disconnect()
 	log.Println("Connected to database")
 
 	router := gin.Default()
 	router.Use(middleware.ErrorHandler())
-	controllers.RegisterControllers(router, jobRepo, runRepo)
+	controllers.RegisterControllers(router, dbResources.JobRepo, dbResources.RunRepo)
 
 	srv := &http.Server{
 		Addr:    os.Getenv("SIMPLE_SCHEDULER_API_URL"),
