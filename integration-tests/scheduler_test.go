@@ -86,7 +86,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	defer msgBusResources.MessageBus.Close()
 
 	job := dtos.Job{
-		Name:      "Test Job",
+		Name:      t.Name() + "-job",
 		Enabled:   true,
 		NextRunAt: time.Now().Add(time.Second),
 		Interval:  1000,
@@ -107,8 +107,9 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	completedRuns := []string{}
 	failedRuns := []string{}
 	client := TestClientWorker{
-		Job:        job,
-		MessageBus: msgBusResources.MessageBus,
+		Job:               job,
+		MessageBus:        msgBusResources.MessageBus,
+		HeartbeatDuration: time.Minute * 1000, // Prevent heartbeat
 		RunStarted: func(runId string) {
 			time.Sleep(time.Millisecond * 50)
 			run, err := dbResources.RunRepo.Read(runId)
@@ -192,7 +193,7 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	defer msgBusResources.MessageBus.Close()
 
 	job := dtos.Job{
-		Name:                "Test Job",
+		Name:                t.Name() + "-job",
 		Enabled:             true,
 		NextRunAt:           time.Now().Add(time.Second),
 		Interval:            1000,
@@ -216,8 +217,9 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	execExpRuns := []string{}
 	hrtbtExpRuns := []string{}
 	client := TestClientWorker{
-		Job:        job,
-		MessageBus: msgBusResources.MessageBus,
+		Job:               job,
+		MessageBus:        msgBusResources.MessageBus,
+		HeartbeatDuration: time.Minute * 1000, // Prevent heartbeat
 		RunStarted: func(runId string) {
 			time.Sleep(time.Millisecond * 50)
 			run, err := dbResources.RunRepo.Read(runId)
@@ -276,5 +278,83 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 
 	manager.Stop()
 	client.Stop()
+	wg.Wait()
+}
+
+func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cRes := initContainers(t, ctx)
+	defer testcontainers.TerminateContainer(cRes.DbContainer)
+	defer testcontainers.TerminateContainer(cRes.MessageBusContainer)
+
+	dbResources, err := resources.RegisterRepos(cRes.DbEnv)
+	require.NoError(t, err)
+
+	err = dbResources.Context.Connect(ctx)
+	require.NoError(t, err)
+	defer dbResources.Context.Disconnect()
+
+	msgBusResources, err := resources.RegisterMessageBus(cRes.MessageBusEnv)
+	require.NoError(t, err)
+
+	err = msgBusResources.MessageBus.Connect()
+	require.NoError(t, err)
+	defer msgBusResources.MessageBus.Close()
+
+	job := dtos.Job{
+		Name:             t.Name() + "-job",
+		Enabled:          true,
+		NextRunAt:        time.Now().Add(time.Second),
+		Interval:         1000,
+		HeartbeatTimeout: 1000,
+	}
+	_, err = dbResources.JobRepo.Add(job)
+	require.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	manager := workers.ManagerWorker{
+		MessageBus:           msgBusResources.MessageBus,
+		JobRepo:              dbResources.JobRepo,
+		RunRepo:              dbResources.RunRepo,
+		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
+		CleanupDuration:      time.Second,
+	}
+	manager.Start(&wg)
+
+	runs := []string{}
+	client := TestClientWorker{
+		Job:               job,
+		MessageBus:        msgBusResources.MessageBus,
+		HeartbeatDuration: time.Millisecond * 100,
+		RunStarted: func(runId string) {
+			time.Sleep(time.Millisecond * 50)
+			run, err := dbResources.RunRepo.Read(runId)
+			require.NoError(t, err)
+			require.Equal(t, runStatuses.Running, run.Status)
+
+			runs = append(runs, runId)
+		},
+	}
+	client.Start(&wg)
+	time.Sleep(time.Second)
+
+	for _, runId := range runs {
+		run, err := dbResources.RunRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Running, run.Status)
+	}
+
+	client.Stop()
+	time.Sleep(time.Second * 2)
+
+	for _, runId := range runs {
+		run, err := dbResources.RunRepo.Read(runId)
+		require.NoError(t, err)
+		require.Equal(t, runStatuses.Pending, run.Status)
+	}
+
+	manager.Stop()
 	wg.Wait()
 }
