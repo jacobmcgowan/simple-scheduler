@@ -2,17 +2,15 @@ package dtos
 
 import (
 	"time"
-
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 )
 
 type JobUpdate struct {
-	Enabled             common.Undefinable[bool]
-	NextRunAt           common.Undefinable[time.Time]
-	Interval            common.Undefinable[int]
-	RunExecutionTimeout common.Undefinable[int]
-	RunStartTimeout     common.Undefinable[int]
-	MaxQueueCount       common.Undefinable[int]
-	AllowConcurrentRuns common.Undefinable[bool]
-	HeartbeatTimeout    common.Undefinable[int]
+	Enabled             *bool      `json:"enabled,omitempty"`
+	NextRunAt           *time.Time `json:"nextRunAt,omitempty"`
+	Interval            *int       `json:"interval,omitempty"`
+	RunExecutionTimeout *int       `json:"runExecutionTimeout,omitempty"`
+	RunStartTimeout     *int       `json:"runStartTimeout,omitempty"`
+	MaxQueueCount       *int       `json:"maxQueueCount,omitempty"`
+	AllowConcurrentRuns *bool      `json:"allowConcurrentRuns,omitempty"`
+	HeartbeatTimeout    *int       `json:"heartbeatTimeout,omitempty"`
 }

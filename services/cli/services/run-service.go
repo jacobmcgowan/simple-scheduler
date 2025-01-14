@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	httpHelpers "github.com/jacobmcgowan/simple-scheduler/services/cli/http-helpers"
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
@@ -16,13 +15,9 @@ type RunService struct {
 }
 
 func (srv RunService) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
-	status := common.Undefinable[string]{
-		Value:   (string)(filter.Status.Value),
-		Defined: filter.Status.Defined,
-	}
 	qb := httpHelpers.NewQueryBuilder()
 	qb.Add("jobName", filter.JobName)
-	qb.Add("status", status)
+	qb.Add("status", (*string)(filter.Status))
 
 	url := fmt.Sprintf("%s/runs%s", srv.ApiUrl, qb.String())
 	resp, err := http.Get(url)

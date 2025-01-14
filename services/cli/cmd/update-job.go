@@ -6,7 +6,6 @@ import (
 
 	"github.com/jacobmcgowan/simple-scheduler/services/cli/cmd/options"
 	"github.com/jacobmcgowan/simple-scheduler/services/cli/services"
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/spf13/cobra"
 )
@@ -21,35 +20,27 @@ var updateJobCmd = &cobra.Command{
 changed; for example, "update job -n myjob --enabled false" will only change the
 enabled status of the job named "myjob".`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		jobUpdate := dtos.JobUpdate{
-			Enabled: common.Undefinable[bool]{
-				Value:   updateJobOptions.Enabled,
-				Defined: cmd.Flags().Changed("enabled"),
-			},
-			Interval: common.Undefinable[int]{
-				Value:   updateJobOptions.Interval,
-				Defined: cmd.Flags().Changed("interval"),
-			},
-			RunExecutionTimeout: common.Undefinable[int]{
-				Value:   updateJobOptions.RunExecutionTimeout,
-				Defined: cmd.Flags().Changed("run-execution-timeout"),
-			},
-			RunStartTimeout: common.Undefinable[int]{
-				Value:   updateJobOptions.RunStartTimeout,
-				Defined: cmd.Flags().Changed("run-start-timeout"),
-			},
-			MaxQueueCount: common.Undefinable[int]{
-				Value:   updateJobOptions.MaxQueueCount,
-				Defined: cmd.Flags().Changed("max-queue-count"),
-			},
-			AllowConcurrentRuns: common.Undefinable[bool]{
-				Value:   updateJobOptions.AllowConcurrentRuns,
-				Defined: cmd.Flags().Changed("allow-concurrent-runs"),
-			},
-			HeartbeatTimeout: common.Undefinable[int]{
-				Value:   updateJobOptions.HeartbeatTimeout,
-				Defined: cmd.Flags().Changed("heartbeat-timeout"),
-			},
+		jobUpdate := dtos.JobUpdate{}
+		if cmd.Flags().Changed("enabled") {
+			jobUpdate.Enabled = &updateJobOptions.Enabled
+		}
+		if cmd.Flags().Changed("interval") {
+			jobUpdate.Interval = &updateJobOptions.Interval
+		}
+		if cmd.Flags().Changed("run-execution-timeout") {
+			jobUpdate.RunExecutionTimeout = &updateJobOptions.RunExecutionTimeout
+		}
+		if cmd.Flags().Changed("run-start-timeout") {
+			jobUpdate.RunStartTimeout = &updateJobOptions.RunStartTimeout
+		}
+		if cmd.Flags().Changed("max-queue-count") {
+			jobUpdate.MaxQueueCount = &updateJobOptions.MaxQueueCount
+		}
+		if cmd.Flags().Changed("allow-concurrent-runs") {
+			jobUpdate.AllowConcurrentRuns = &updateJobOptions.AllowConcurrentRuns
+		}
+		if cmd.Flags().Changed("heartbeat-timeout") {
+			jobUpdate.HeartbeatTimeout = &updateJobOptions.HeartbeatTimeout
 		}
 
 		if cmd.Flags().Changed("next-run-at") {
@@ -58,10 +49,7 @@ enabled status of the job named "myjob".`,
 				return fmt.Errorf("nextRunAt, %s, is not a valid RFC3339 datetime", updateJobOptions.NextRunAt)
 			}
 
-			jobUpdate.NextRunAt = common.Undefinable[time.Time]{
-				Value:   nextRunAtTime,
-				Defined: true,
-			}
+			jobUpdate.NextRunAt = &nextRunAtTime
 		}
 
 		svc := services.JobService{

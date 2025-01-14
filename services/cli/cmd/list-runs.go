@@ -5,16 +5,15 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/jacobmcgowan/simple-scheduler/services/cli/cmd/options"
 	"github.com/jacobmcgowan/simple-scheduler/services/cli/services"
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 	"github.com/jacobmcgowan/simple-scheduler/shared/validators"
 	"github.com/spf13/cobra"
 )
 
-var job string
-var status string
+var listRunsOptions = options.RunFilterOptions{}
 
 var statusChoices = fmt.Sprintf("%s|%s|%s|%s|%s|%s",
 	runStatuses.Pending,
@@ -31,21 +30,20 @@ var runsCmd = &cobra.Command{
 	Long: `Provides details on the runs for the current jobs that are
 scheduled.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if !validators.ValidateRunStatus(status, true) {
+		if !validators.ValidateRunStatus(listRunsOptions.Status, true) {
 			fmt.Printf("Invalid run status. Acceptable statuses are %s.", statusChoices)
 			return
 		}
 
-		filter := dtos.RunFilter{
-			JobName: common.Undefinable[string]{
-				Value:   job,
-				Defined: job != "",
-			},
-			Status: common.Undefinable[runStatuses.RunStatus]{
-				Value:   runStatuses.RunStatus(status),
-				Defined: status != "",
-			},
+		filter := dtos.RunFilter{}
+		if listRunsOptions.JobName != "" {
+			filter.JobName = &listRunsOptions.JobName
 		}
+		if listRunsOptions.Status != "" {
+			runStatus := runStatuses.RunStatus(listRunsOptions.Status)
+			filter.Status = &runStatus
+		}
+
 		svc := services.RunService{
 			ApiUrl: ApiUrl,
 		}
@@ -67,6 +65,6 @@ scheduled.`,
 
 func init() {
 	listCmd.AddCommand(runsCmd)
-	runsCmd.Flags().StringVarP(&job, "job", "j", "", "The job to list the runs for.")
-	runsCmd.Flags().StringVarP(&status, "status", "s", "", fmt.Sprintf("The status of the runs to list (%s).", statusChoices))
+	runsCmd.Flags().StringVarP(&listRunsOptions.JobName, "job", "j", "", "The job to list the runs for.")
+	runsCmd.Flags().StringVarP(&listRunsOptions.Status, "status", "s", "", fmt.Sprintf("The status of the runs to list (%s).", statusChoices))
 }

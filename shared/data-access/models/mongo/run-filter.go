@@ -7,56 +7,11 @@ import (
 
 func RunFilterFromDto(dto dtos.RunFilter) bson.D {
 	filter := bson.D{}
-
-	if dto.JobName.Defined {
-		filter = append(filter, bson.E{
-			Key: "jobName",
-			Value: bson.D{{
-				Key:   "$eq",
-				Value: dto.JobName.Value,
-			}},
-		})
-	}
-
-	if dto.Status.Defined {
-		filter = append(filter, bson.E{
-			Key: "status",
-			Value: bson.D{{
-				Key:   "$eq",
-				Value: dto.Status.Value,
-			}},
-		})
-	}
-
-	if dto.CreatedBefore.Defined {
-		filter = append(filter, bson.E{
-			Key: "createdTime",
-			Value: bson.D{{
-				Key:   "$lt",
-				Value: dto.CreatedBefore.Value,
-			}},
-		})
-	}
-
-	if dto.StartedBefore.Defined {
-		filter = append(filter, bson.E{
-			Key: "startTime",
-			Value: bson.D{{
-				Key:   "$lt",
-				Value: dto.StartedBefore.Value,
-			}},
-		})
-	}
-
-	if dto.HeartbeatBefore.Defined {
-		filter = append(filter, bson.E{
-			Key: "heartbeat",
-			Value: bson.D{{
-				Key:   "$lt",
-				Value: dto.HeartbeatBefore.Value,
-			}},
-		})
-	}
+	filter = AppendBsonCondition(filter, "jobName", "$eq", dto.JobName)
+	filter = AppendBsonCondition(filter, "status", "$eq", dto.Status)
+	filter = AppendBsonCondition(filter, "createdTime", "$lt", dto.CreatedBefore)
+	filter = AppendBsonCondition(filter, "startTime", "$lt", dto.StartedBefore)
+	filter = AppendBsonCondition(filter, "heartbeat", "$lt", dto.HeartbeatBefore)
 
 	return filter
 }
