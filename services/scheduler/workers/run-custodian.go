@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/jobActions"
@@ -77,19 +76,12 @@ func (worker *RunCustodian) restartStuckRuns() error {
 		return nil
 	}
 
+	runningStatus := runStatuses.Running
+	heartbeatBefore := time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.HeartbeatTimeout))
 	filter := dtos.RunFilter{
-		JobName: common.Undefinable[string]{
-			Value:   worker.Job.Name,
-			Defined: true,
-		},
-		Status: common.Undefinable[runStatuses.RunStatus]{
-			Value:   runStatuses.Running,
-			Defined: true,
-		},
-		HeartbeatBefore: common.Undefinable[time.Time]{
-			Value:   time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.HeartbeatTimeout)),
-			Defined: true,
-		},
+		JobName:         &worker.Job.Name,
+		Status:          &runningStatus,
+		HeartbeatBefore: &heartbeatBefore,
 	}
 	runs, err := worker.RunRepo.Browse(filter)
 	if err != nil {
@@ -98,12 +90,10 @@ func (worker *RunCustodian) restartStuckRuns() error {
 
 	count := 0
 	errs := []error{}
+	pendingStatus := runStatuses.Pending
 	for _, run := range runs {
 		runUpdate := dtos.RunUpdate{
-			Status: common.Undefinable[runStatuses.RunStatus]{
-				Value:   runStatuses.Pending,
-				Defined: true,
-			},
+			Status: &pendingStatus,
 		}
 		if err := worker.RunRepo.Edit(run.Id, runUpdate); err != nil {
 			errs = append(errs, fmt.Errorf("failed to reset run %s: %s", run.Id, err))
@@ -124,11 +114,9 @@ func (worker *RunCustodian) restartStuckRuns() error {
 }
 
 func (worker *RunCustodian) cancelRun(runId string) error {
+	cancellingStatus := runStatuses.Cancelling
 	runUpdate := dtos.RunUpdate{
-		Status: common.Undefinable[runStatuses.RunStatus]{
-			Value:   runStatuses.Cancelling,
-			Defined: true,
-		},
+		Status: &cancellingStatus,
 	}
 	if err := worker.RunRepo.Edit(runId, runUpdate); err != nil {
 		return fmt.Errorf("failed to cancel run %s: %s", runId, err)
@@ -181,19 +169,12 @@ func (worker *RunCustodian) cancelTimeoutPendingRuns() error {
 		return nil
 	}
 
+	pendingStatus := runStatuses.Pending
+	createdBefore := time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunStartTimeout))
 	filter := dtos.RunFilter{
-		JobName: common.Undefinable[string]{
-			Value:   worker.Job.Name,
-			Defined: true,
-		},
-		Status: common.Undefinable[runStatuses.RunStatus]{
-			Value:   runStatuses.Pending,
-			Defined: true,
-		},
-		CreatedBefore: common.Undefinable[time.Time]{
-			Value:   time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunStartTimeout)),
-			Defined: true,
-		},
+		JobName:       &worker.Job.Name,
+		Status:        &pendingStatus,
+		CreatedBefore: &createdBefore,
 	}
 	runs, err := worker.RunRepo.Browse(filter)
 	if err != nil {
@@ -208,19 +189,12 @@ func (worker *RunCustodian) cancelTimeoutRunningRuns() error {
 		return nil
 	}
 
+	runningStatus := runStatuses.Running
+	startedBefore := time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunExecutionTimeout))
 	filter := dtos.RunFilter{
-		JobName: common.Undefinable[string]{
-			Value:   worker.Job.Name,
-			Defined: true,
-		},
-		Status: common.Undefinable[runStatuses.RunStatus]{
-			Value:   runStatuses.Running,
-			Defined: true,
-		},
-		StartedBefore: common.Undefinable[time.Time]{
-			Value:   time.Now().Add(time.Duration(-int(time.Millisecond) * worker.Job.RunExecutionTimeout)),
-			Defined: true,
-		},
+		JobName:       &worker.Job.Name,
+		Status:        &runningStatus,
+		StartedBefore: &startedBefore,
 	}
 	runs, err := worker.RunRepo.Browse(filter)
 	if err != nil {

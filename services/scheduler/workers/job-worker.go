@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
@@ -143,10 +142,7 @@ func (worker *JobWorker) setNextRunTime() error {
 	tilNextRun := time.Duration(worker.Job.Interval * int(intervals) * int(time.Millisecond))
 	nextRunAt := worker.Job.NextRunAt.Add(tilNextRun)
 	update := dtos.JobUpdate{
-		NextRunAt: common.Undefinable[time.Time]{
-			Value:   nextRunAt,
-			Defined: true,
-		},
+		NextRunAt: &nextRunAt,
 	}
 
 	if err := worker.JobRepo.Edit(worker.Job.Name, update); err != nil {
@@ -194,24 +190,18 @@ func (worker *JobWorker) startRun() error {
 func (worker *JobWorker) updateRunStatus(runId string, status runStatuses.RunStatus) error {
 	now := time.Now()
 	runUpdate := dtos.RunUpdate{
-		Status: common.Undefinable[runStatuses.RunStatus]{
-			Value:   status,
-			Defined: true,
-		},
-		StartTime: common.Undefinable[time.Time]{
-			Value:   now,
-			Defined: status == runStatuses.Running,
-		},
-		Heartbeat: common.Undefinable[time.Time]{
-			Value:   now,
-			Defined: status == runStatuses.Running,
-		},
-		EndTime: common.Undefinable[time.Time]{
-			Value: now,
-			Defined: status == runStatuses.Completed ||
-				status == runStatuses.Failed ||
-				status == runStatuses.Cancelled,
-		},
+		Status: &status,
+	}
+	switch status {
+	case runStatuses.Cancelled, runStatuses.Completed, runStatuses.Failed:
+		runUpdate.EndTime = &now
+	case runStatuses.Cancelling:
+	case runStatuses.Pending:
+	case runStatuses.Running:
+		runUpdate.StartTime = &now
+		runUpdate.Heartbeat = &now
+	default:
+		return fmt.Errorf("unsupported status %s", status)
 	}
 
 	if err := worker.RunRepo.Edit(runId, runUpdate); err != nil {
@@ -222,11 +212,9 @@ func (worker *JobWorker) updateRunStatus(runId string, status runStatuses.RunSta
 }
 
 func (worker *JobWorker) updateRunHeartbeat(runId string) error {
+	now := time.Now()
 	runUpdate := dtos.RunUpdate{
-		Heartbeat: common.Undefinable[time.Time]{
-			Value:   time.Now(),
-			Defined: true,
-		},
+		Heartbeat: &now,
 	}
 
 	if err := worker.RunRepo.Edit(runId, runUpdate); err != nil {

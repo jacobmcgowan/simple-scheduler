@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	responseHelpers "github.com/jacobmcgowan/simple-scheduler/services/api/response-helpers"
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
@@ -47,11 +46,9 @@ func (cont RunController) Cancel(ctx *gin.Context, id string) {
 			"error": "Run already finished",
 		})
 	case runStatuses.Pending, runStatuses.Running:
+		cancellingStatus := runStatuses.Cancelling
 		runUpdate := dtos.RunUpdate{
-			Status: common.Undefinable[runStatuses.RunStatus]{
-				Value:   runStatuses.Cancelling,
-				Defined: true,
-			},
+			Status: &cancellingStatus,
 		}
 
 		if err := cont.runRepo.Edit(id, runUpdate); err == nil {

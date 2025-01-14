@@ -3,8 +3,6 @@ package httpHelpers
 import (
 	"fmt"
 	"strings"
-
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 )
 
 type QueryBuilder struct {
@@ -17,9 +15,9 @@ func NewQueryBuilder() QueryBuilder {
 	}
 }
 
-func (qb *QueryBuilder) Add(param string, val common.Undefinable[string]) {
-	if val.Defined {
-		qb.params[param] = val.Value
+func (qb *QueryBuilder) Add(param string, value *string) {
+	if value != nil {
+		qb.params[param] = *value
 	} else {
 		delete(qb.params, param)
 	}

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jacobmcgowan/simple-scheduler/services/scheduler/workers"
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
@@ -156,10 +155,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	}
 
 	runFilter := dtos.RunFilter{
-		JobName: common.Undefinable[string]{
-			Value:   jobName,
-			Defined: true,
-		},
+		JobName: &jobName,
 	}
 	runs, err := dbResources.RunRepo.Browse(runFilter)
 	require.NoError(t, err)
@@ -242,15 +238,10 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 
 	time.Sleep(time.Second) // wait for a run that the client will not start
 
+	cancellingStatus := runStatuses.Cancelling
 	cancelledFilter := dtos.RunFilter{
-		JobName: common.Undefinable[string]{
-			Value:   jobName,
-			Defined: true,
-		},
-		Status: common.Undefinable[runStatuses.RunStatus]{
-			Value:   runStatuses.Cancelling,
-			Defined: true,
-		},
+		JobName: &jobName,
+		Status:  &cancellingStatus,
 	}
 	cancelledRuns, err := dbResources.RunRepo.Browse(cancelledFilter)
 	require.NoError(t, err)

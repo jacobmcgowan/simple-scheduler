@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/jacobmcgowan/simple-scheduler/shared/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
@@ -92,7 +91,7 @@ func (svc JobService) Add(job dtos.Job) (string, error) {
 
 func (svc JobService) Edit(name string, jobUpdate dtos.JobUpdate) error {
 	url := fmt.Sprintf("%s/jobs/%s", svc.ApiUrl, name)
-	reqBody, err := converters.JobUpdateToPatch(jobUpdate)
+	reqBody, err := json.Marshal(jobUpdate)
 	if err != nil {
 		return err
 	}

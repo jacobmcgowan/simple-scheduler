@@ -1,16 +1,11 @@
 package controllers
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jacobmcgowan/simple-scheduler/services/api/converters"
-	"github.com/jacobmcgowan/simple-scheduler/shared/common"
-	sharedConverters "github.com/jacobmcgowan/simple-scheduler/shared/converters"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
-	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
 	"github.com/jacobmcgowan/simple-scheduler/shared/validators"
 )
 
@@ -53,16 +48,9 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository,
 	})
 	jobs.PATCH("/:name", func(ctx *gin.Context) {
 		name := ctx.Param("name")
-		jsonData, err := io.ReadAll(ctx.Request.Body)
-		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
 
-		jobUpdate, err := sharedConverters.PatchToJobUpdate(jsonData)
-		if err != nil {
+		var jobUpdate dtos.JobUpdate
+		if err := ctx.ShouldBindJSON(&jobUpdate); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"error": err.Error(),
 			})
@@ -84,20 +72,20 @@ func RegisterControllers(router *gin.Engine, jobRepo repositories.JobRepository,
 
 	runs := api.Group("/runs")
 	runs.GET("", func(ctx *gin.Context) {
-		status := converters.ParamToUndefinableString(ctx.Params, "status")
-		if status.Defined && !validators.ValidateRunStatus(status.Value, true) {
+		var filter dtos.RunFilter
+		if err := ctx.ShouldBind(&filter); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		if filter.Status != nil && !validators.ValidateRunStatus(string(*filter.Status), true) {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"status": "Invalid run status",
 			})
 		}
 
-		filter := dtos.RunFilter{
-			JobName: converters.ParamToUndefinableString(ctx.Params, "jobName"),
-			Status: common.Undefinable[runStatuses.RunStatus]{
-				Value:   runStatuses.RunStatus(status.Value),
-				Defined: status.Defined && status.Value != "",
-			},
-		}
 		cont := RunController{
 			runRepo: runRepo,
 		}
