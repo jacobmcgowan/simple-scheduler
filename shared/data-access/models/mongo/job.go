@@ -16,6 +16,8 @@ type Job struct {
 	MaxQueueCount       int       `bson:"maxQueueCount"`
 	AllowConcurrentRuns bool      `bson:"allowConcurrentRuns"`
 	HeartbeatTimeout    int       `bson:"heartbeatTimeout"`
+	ManagerId           *string   `bson:"managerId,omitempty"`
+	Heartbeat           time.Time `bson:"heartbeat"`
 }
 
 func (job Job) ToDto() dtos.Job {

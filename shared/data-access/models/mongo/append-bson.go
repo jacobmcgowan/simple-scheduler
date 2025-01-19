@@ -1,11 +1,10 @@
 package mongoModels
 
 import (
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func AppendBson[T any](doc primitive.D, field string, value *T) primitive.D {
+func AppendBson[T any](doc bson.D, field string, value *T) bson.D {
 	if value != nil {
 		return append(doc, bson.E{
 			Key:   field,
@@ -16,7 +15,7 @@ func AppendBson[T any](doc primitive.D, field string, value *T) primitive.D {
 	return doc
 }
 
-func AppendBsonCondition[T any](doc primitive.D, field string, condition string, value *T) primitive.D {
+func AppendBsonCondition[T any](doc bson.D, field string, condition string, value *T) bson.D {
 	if value != nil {
 		return append(doc, bson.E{
 			Key: field,

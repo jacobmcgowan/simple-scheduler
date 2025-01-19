@@ -8,7 +8,7 @@ import (
 	dbTypes "github.com/jacobmcgowan/simple-scheduler/shared/data-access/db-types"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	mongoRepos "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type DbEnv struct {
