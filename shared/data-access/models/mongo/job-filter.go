@@ -17,8 +17,8 @@ func JobFilterFromDto(dto dtos.JobFilter) (bson.D, *options.FindOptionsBuilder, 
 	unmngFilter := unmanagedFilterFromDto(dto)
 
 	opts := options.Find()
-	if dto.Take != nil {
-		opts = opts.SetLimit(int64(*dto.Take))
+	if dto.Take > 0 {
+		opts = opts.SetLimit(int64(dto.Take))
 	}
 
 	if mngrIdFilter != nil && unmngFilter != nil {
@@ -31,7 +31,7 @@ func JobFilterFromDto(dto dtos.JobFilter) (bson.D, *options.FindOptionsBuilder, 
 		})
 		opts = opts.SetSort(bson.D{{
 			Key:   "managerId",
-			Value: 1,
+			Value: -1,
 		}})
 	} else if mngrIdFilter != nil {
 		filter = append(filter, *mngrIdFilter)
@@ -74,7 +74,7 @@ func unmanagedFilterFromDto(dto dtos.JobFilter) *bson.E {
 		Key: "managerId",
 		Value: bson.D{{
 			Key:   "$eq",
-			Value: nil,
+			Value: bson.NilObjectID,
 		}},
 	}
 

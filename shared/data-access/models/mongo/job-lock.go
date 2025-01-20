@@ -31,7 +31,10 @@ func JobLock(managerId string, heartbeat time.Time) (bson.D, error) {
 
 func JobUnlock() bson.D {
 	return bson.D{{
-		Key:   "$unset",
-		Value: "managerId",
+		Key: "$set",
+		Value: bson.D{{
+			Key:   "managerId",
+			Value: bson.NilObjectID,
+		}},
 	}}
 }

@@ -13,6 +13,7 @@ import (
 	controllers "github.com/jacobmcgowan/simple-scheduler/services/api/contollers"
 	"github.com/jacobmcgowan/simple-scheduler/services/api/middleware"
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
+	envVars "github.com/jacobmcgowan/simple-scheduler/shared/resources/env-vars"
 	"github.com/joho/godotenv"
 )
 
@@ -50,7 +51,7 @@ func main() {
 	controllers.RegisterControllers(router, dbResources.JobRepo, dbResources.RunRepo)
 
 	srv := &http.Server{
-		Addr:    os.Getenv("SIMPLE_SCHEDULER_API_URL"),
+		Addr:    os.Getenv(envVars.ApiUrl),
 		Handler: router,
 	}
 

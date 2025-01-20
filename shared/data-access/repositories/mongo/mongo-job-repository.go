@@ -193,18 +193,12 @@ func (repo MongoJobRepository) Lock(filter dtos.JobLockFilter) ([]dtos.Job, erro
 	return jobs, nil
 }
 
-func (repo MongoJobRepository) Unlock(managerId string) error {
-	objId, err := bson.ObjectIDFromHex(managerId)
+func (repo MongoJobRepository) Unlock(filter dtos.JobUnlockFilter) error {
+	filterDoc, err := mongoModels.JobUnlockFilterFromDto(filter)
 	if err != nil {
-		return &repositoryErrors.InvalidIdError{
-			Value: managerId,
-		}
+		return fmt.Errorf("invalid filter: %s", err)
 	}
 
-	filterDoc := bson.D{{
-		Key:   "managerId",
-		Value: objId,
-	}}
 	updateDoc := mongoModels.JobUnlock()
 	coll := repo.DbContext.db.Collection(JobsCollection)
 	if _, err = coll.UpdateMany(repo.DbContext.ctx, filterDoc, updateDoc); err != nil {

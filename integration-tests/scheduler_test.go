@@ -95,13 +95,17 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
+		Hostname:             t.Name() + "-manager",
+		MaxJobs:              0,
 		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 	}
 	manager.Start(&wg)
+	job.ManagerId = manager.Id
 
 	completedRuns := []string{}
 	failedRuns := []string{}
@@ -201,13 +205,17 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
+		Hostname:             t.Name() + "-manager",
+		MaxJobs:              0,
 		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
 	}
 	manager.Start(&wg)
+	job.ManagerId = manager.Id
 
 	execExpRuns := []string{}
 	client := TestClientWorker{
@@ -286,13 +294,17 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
+		Hostname:             t.Name() + "-manager",
+		MaxJobs:              0,
 		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
 	}
 	manager.Start(&wg)
+	job.ManagerId = manager.Id
 
 	runs := []string{}
 	client := TestClientWorker{

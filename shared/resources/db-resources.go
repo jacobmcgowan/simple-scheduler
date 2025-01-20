@@ -8,6 +8,7 @@ import (
 	dbTypes "github.com/jacobmcgowan/simple-scheduler/shared/data-access/db-types"
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	mongoRepos "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/mongo"
+	envVars "github.com/jacobmcgowan/simple-scheduler/shared/resources/env-vars"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
@@ -18,17 +19,18 @@ type DbEnv struct {
 }
 
 type DbResources struct {
-	Name    string
-	Context repositories.DbContext
-	JobRepo repositories.JobRepository
-	RunRepo repositories.RunRepository
+	Name        string
+	Context     repositories.DbContext
+	ManagerRepo repositories.ManagerRepository
+	JobRepo     repositories.JobRepository
+	RunRepo     repositories.RunRepository
 }
 
 func LoadDbEnv() DbEnv {
 	return DbEnv{
-		Type:             os.Getenv("SIMPLE_SCHEDULER_DB_TYPE"),
-		ConnectionString: os.Getenv("SIMPLE_SCHEDULER_DB_CONNECTION_STRING"),
-		Name:             os.Getenv("SIMPLE_SCHEDULER_DB_NAME"),
+		Type:             os.Getenv(envVars.DbType),
+		ConnectionString: os.Getenv(envVars.DbConnectionString),
+		Name:             os.Getenv(envVars.DbName),
 	}
 }
 
@@ -50,6 +52,9 @@ func RegisterRepos(env DbEnv) (DbResources, error) {
 			DbName:  env.Name,
 			Options: *options.Client().ApplyURI(env.ConnectionString),
 		}
+		mngrRepo := mongoRepos.MongoManagerRepository{
+			DbContext: &dbCtx,
+		}
 		jobRepo := mongoRepos.MongoJobRepository{
 			DbContext: &dbCtx,
 		}
@@ -58,10 +63,11 @@ func RegisterRepos(env DbEnv) (DbResources, error) {
 		}
 
 		dbResources := DbResources{
-			Name:    env.Name + "@" + conStrUrl.Host,
-			Context: &dbCtx,
-			JobRepo: jobRepo,
-			RunRepo: runRepo,
+			Name:        env.Name + "@" + conStrUrl.Host,
+			Context:     &dbCtx,
+			ManagerRepo: mngrRepo,
+			JobRepo:     jobRepo,
+			RunRepo:     runRepo,
 		}
 		return dbResources, nil
 	default:

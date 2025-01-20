@@ -15,7 +15,7 @@ type Job struct {
 	MaxQueueCount       int       `json:"maxQueueCount"`
 	AllowConcurrentRuns bool      `json:"allowConcurrentRuns"`
 	HeartbeatTimeout    int       `json:"heartbeatTimeout"`
-	ManagerId           *string   `json:"managerId,omitempty"`
+	ManagerId           string    `json:"managerId,omitempty"`
 	Heartbeat           time.Time `json:"heartbeat"`
 }
 
