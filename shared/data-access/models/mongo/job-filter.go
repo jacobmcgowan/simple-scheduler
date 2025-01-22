@@ -73,8 +73,8 @@ func unmanagedFilterFromDto(dto dtos.JobFilter) *bson.E {
 	filter := bson.E{
 		Key: "managerId",
 		Value: bson.D{{
-			Key:   "$eq",
-			Value: bson.NilObjectID,
+			Key:   "$exists",
+			Value: false,
 		}},
 	}
 

@@ -105,7 +105,6 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 	}
 	manager.Start(&wg)
-	job.ManagerId = manager.Id
 
 	completedRuns := []string{}
 	failedRuns := []string{}
@@ -215,7 +214,6 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 		CleanupDuration:      time.Second,
 	}
 	manager.Start(&wg)
-	job.ManagerId = manager.Id
 
 	execExpRuns := []string{}
 	client := TestClientWorker{
@@ -304,7 +302,6 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 		CleanupDuration:      time.Second,
 	}
 	manager.Start(&wg)
-	job.ManagerId = manager.Id
 
 	runs := []string{}
 	client := TestClientWorker{
