@@ -14,13 +14,7 @@ func JobUnlockFilterFromDto(dto dtos.JobUnlockFilter) (bson.D, error) {
 		}
 	}
 
-	filter := bson.D{{
-		Key: "managerId",
-		Value: bson.D{{
-			Key:   "$eq",
-			Value: objId,
-		}},
-	}}
+	filter := AppendBsonCondition(bson.D{}, "managerId", "$eq", &objId)
 
 	if dto.JobNames != nil && len(dto.JobNames) > 0 {
 		filter = append(filter, bson.E{

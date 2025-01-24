@@ -38,9 +38,9 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
 		return nil
 	}
 
-	log.Println("Starting job manager...")
+	log.Printf("Starting job manager @%s...\n", worker.Hostname)
 	if err := worker.registerWorker(); err != nil {
-		return fmt.Errorf("failed to start job manager: %s", err)
+		return fmt.Errorf("failed to start job manager @%s: %s", worker.Hostname, err)
 	}
 
 	worker.jobs = make(map[string]*JobWorker)
@@ -50,7 +50,7 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
 
 	go worker.process(wg)
 	worker.isRunning = true
-	log.Printf("Started job manager %s\n", worker.Id)
+	log.Printf("Started job manager %s@%s\n", worker.Id, worker.Hostname)
 
 	return nil
 }
@@ -59,22 +59,22 @@ func (worker *ManagerWorker) Stop() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
 
-	log.Println("Stopping job manager...")
+	log.Printf("Stopping job manager %s@%s...\n", worker.Id, worker.Hostname)
 	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
 func (worker *ManagerWorker) registerWorker() error {
-	log.Println("Registering job manager...")
+	log.Printf("Registering job manager @%s...\n", worker.Hostname)
 	mngr := dtos.Manager{
 		Hostname: worker.Hostname,
 	}
 	id, err := worker.ManagerRepo.Add(mngr)
 	if err != nil {
-		return fmt.Errorf("failed to register manager: %s", err)
+		return fmt.Errorf("failed to register manager @%s: %s", worker.Hostname, err)
 	}
 
-	log.Printf("Registered job manager %s\n", id)
+	log.Printf("Registered job manager %s@%s\n", id, worker.Hostname)
 
 	worker.Id = id
 	return nil
@@ -93,6 +93,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	}
 
 	for _, job := range jobs {
+		log.Printf("Locked job %s for manager %s@%s\n", job.Name, worker.Id, worker.Hostname)
 		jobWorker, found := worker.jobs[job.Name]
 		if found {
 			jobWorker.Job = job
@@ -194,7 +195,7 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 				log.Printf("Error occurred when stopping jobs: %s", err)
 			}
 
-			log.Println("Stopped job manager")
+			log.Printf("Stopped job manager %s@%s\n", worker.Id, worker.Hostname)
 			return
 		case <-time.After(time.Until(worker.nextCacheRefreshAt)):
 			log.Println("Refreshing jobs cache...")
