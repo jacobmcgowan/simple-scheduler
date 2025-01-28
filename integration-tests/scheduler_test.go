@@ -15,7 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-func TestRecurringJobWithRabbitMQ(t *testing.T) {
+func TestRecurringJob(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -56,6 +56,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
 	err = mngr.Start(&wg)
 	require.NoError(t, err)
@@ -124,7 +125,7 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRunCleanupWithRabbitMQ(t *testing.T) {
+func TestRunCleanup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -167,6 +168,7 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
 	err = mngr.Start(&wg)
 	require.NoError(t, err)
@@ -216,7 +218,7 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	wg.Wait()
 }
 
-func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
+func TestRunHeartbeat(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -258,6 +260,7 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
 	err = mngr.Start(&wg)
 	require.NoError(t, err)
@@ -300,7 +303,7 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 	wg.Wait()
 }
 
-func TestConcurrentManagerWorkersWithRabbitMQ(t *testing.T) {
+func TestConcurrentManagerWorkers(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -364,6 +367,7 @@ func TestConcurrentManagerWorkersWithRabbitMQ(t *testing.T) {
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
 	err = mngrA.Start(&wg)
 	require.NoError(t, err)
@@ -377,6 +381,7 @@ func TestConcurrentManagerWorkersWithRabbitMQ(t *testing.T) {
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
 	err = mngrB.Start(&wg)
 	require.NoError(t, err)

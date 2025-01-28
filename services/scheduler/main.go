@@ -41,6 +41,21 @@ func main() {
 		log.Fatalf("Invalid value for %s, %s", envVars.MaxJobs, maxJobsStr)
 	}
 
+	refreshInterval, err := strconv.Atoi(os.Getenv(envVars.CacheRefreshInterval))
+	if err != nil || refreshInterval < 1 {
+		log.Fatalf("Cache refresh interval invalid")
+	}
+
+	cleanupInterval, err := strconv.Atoi(os.Getenv(envVars.CleanupInterval))
+	if err != nil || cleanupInterval < 1 {
+		log.Fatalf("Cleanup interval invalid")
+	}
+
+	hrtbtInterval, err := strconv.Atoi(os.Getenv(envVars.HeartbeatInterval))
+	if err != nil || hrtbtInterval < 1 {
+		log.Fatalf("Heartbeat interval invalid")
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -70,16 +85,6 @@ func main() {
 	defer msgBusResources.MessageBus.Close()
 	log.Println("Connected to message bus")
 
-	refreshInterval, err := strconv.Atoi(os.Getenv(envVars.CacheRefreshInterval))
-	if err != nil || refreshInterval < 1 {
-		log.Fatalf("Cache refresh interval invalid")
-	}
-
-	cleanupInterval, err := strconv.Atoi(os.Getenv(envVars.CleanupInterval))
-	if err != nil || cleanupInterval < 1 {
-		log.Fatalf("Cleanup interval invalid")
-	}
-
 	wg := sync.WaitGroup{}
 	manager := workers.ManagerWorker{
 		Hostname:             hostname,
@@ -90,6 +95,7 @@ func main() {
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Duration(int(time.Millisecond) * refreshInterval),
 		CleanupDuration:      time.Duration(int(time.Millisecond) * cleanupInterval),
+		HeartbeatDuration:    time.Duration(int(time.Millisecond) * hrtbtInterval),
 	}
 
 	manager.Start(&wg)

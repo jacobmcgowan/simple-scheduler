@@ -22,6 +22,7 @@ type ManagerWorker struct {
 	RunRepo              repositories.RunRepository
 	CacheRefreshDuration time.Duration
 	CleanupDuration      time.Duration
+	HeartbeatDuration    time.Duration
 	nextCacheRefreshAt   time.Time
 	jobs                 map[string]*JobWorker
 	custodians           map[string]*RunCustodian
@@ -163,6 +164,14 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	return nil
 }
 
+func (worker *ManagerWorker) setHeartbeat() error {
+	if err := worker.JobRepo.Heartbeat(worker.Id); err != nil {
+		return fmt.Errorf("failed to set heartbeat: %s", err)
+	}
+
+	return nil
+}
+
 func (worker *ManagerWorker) stopAllJobs() error {
 	for name, job := range worker.jobs {
 		job.Stop()
@@ -203,6 +212,13 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 				log.Printf("Failed to refresh jobs cache: %s", err)
 			} else {
 				log.Printf("Refreshed jobs cache, %d loaded", len(worker.jobs))
+			}
+		case <-time.After(worker.HeartbeatDuration):
+			log.Println("Setting heartbeat of jobs...")
+			if err := worker.setHeartbeat(); err != nil {
+				log.Printf("Failed to set heartbeat: %s", err)
+			} else {
+				log.Println("Set heartbeat of jobs")
 			}
 		}
 	}

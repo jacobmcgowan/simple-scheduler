@@ -2,6 +2,7 @@ package mongoRepos
 
 import (
 	"fmt"
+	"time"
 
 	mongoModels "github.com/jacobmcgowan/simple-scheduler/shared/data-access/models/mongo"
 	repositoryErrors "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/errors"
@@ -186,4 +187,22 @@ func (repo MongoJobRepository) Unlock(filter dtos.JobUnlockFilter) (int64, error
 	}
 
 	return cur.ModifiedCount, nil
+}
+
+func (repo MongoJobRepository) Heartbeat(mngrId string) error {
+	filterDoc := mongoModels.AppendBsonCondition(bson.D{}, "managerId", "$eq", &mngrId)
+	updateDoc := bson.D{{
+		Key: "$set",
+		Value: bson.D{{
+			Key:   "heartbeat",
+			Value: time.Now(),
+		}},
+	}}
+	coll := repo.DbContext.db.Collection(JobsCollection)
+	_, err := coll.UpdateMany(repo.DbContext.ctx, filterDoc, updateDoc)
+	if err != nil {
+		return fmt.Errorf("failed to set heartbeat: %s", err)
+	}
+
+	return nil
 }

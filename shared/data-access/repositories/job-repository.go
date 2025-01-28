@@ -10,4 +10,5 @@ type JobRepository interface {
 	Delete(name string) error
 	Lock(filter dtos.JobLockFilter) ([]dtos.Job, error)
 	Unlock(filter dtos.JobUnlockFilter) (int64, error)
+	Heartbeat(mngrId string) error
 }

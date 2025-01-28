@@ -10,5 +10,6 @@ const (
 	CleanupInterval            = "SIMPLE_SCHEDULER_CLEANUP_INTERVAL"
 	CacheRefreshInterval       = "SIMPLE_SCHEDULER_CACHE_REFRESH_INTERVAL"
 	HeartbeatTimeout           = "SIMPLE_SCHEDULER_HEARTBEAT_TIMEOUT"
+	HeartbeatInterval          = "SIMPLE_SCHEDULER_HEARTBEAT_INTERVAL"
 	ApiUrl                     = "SIMPLE_SCHEDULER_API_URL"
 )

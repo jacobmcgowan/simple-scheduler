@@ -1,6 +1,8 @@
 package mongoModels
 
 import (
+	"time"
+
 	repositoryErrors "github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories/errors"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -51,6 +53,9 @@ func JobAggregatorFromDto(dto dtos.JobLockFilter, collection string) (mongo.Pipe
 		Value: bson.D{{
 			Key:   "managerId",
 			Value: objId,
+		}, {
+			Key:   "heartbeat",
+			Value: time.Now(),
 		}},
 	}}
 	mergeStage := bson.D{{
