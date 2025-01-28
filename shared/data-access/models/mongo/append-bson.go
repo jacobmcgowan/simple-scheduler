@@ -19,10 +19,9 @@ func AppendBsonCondition[T any](doc bson.D, field string, condition string, valu
 	if value != nil {
 		return append(doc, bson.E{
 			Key: field,
-			Value: bson.D{{
-				Key:   condition,
-				Value: value,
-			}},
+			Value: bson.M{
+				condition: value,
+			},
 		})
 	}
 

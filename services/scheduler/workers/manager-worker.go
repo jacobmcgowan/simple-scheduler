@@ -149,10 +149,10 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	}
 
 	unlockFilter := dtos.JobUnlockFilter{
-		ManagerId: worker.Id,
+		ManagerId: &worker.Id,
 		JobNames:  unlockJobNames,
 	}
-	if err = worker.JobRepo.Unlock(unlockFilter); err != nil {
+	if _, err = worker.JobRepo.Unlock(unlockFilter); err != nil {
 		jobErrs = append(jobErrs, fmt.Errorf("failed to unlock jobs: %s", err))
 	}
 
@@ -175,9 +175,9 @@ func (worker *ManagerWorker) stopAllJobs() error {
 	}
 
 	unlockFilter := dtos.JobUnlockFilter{
-		ManagerId: worker.Id,
+		ManagerId: &worker.Id,
 	}
-	if err := worker.JobRepo.Unlock(unlockFilter); err != nil {
+	if _, err := worker.JobRepo.Unlock(unlockFilter); err != nil {
 		return fmt.Errorf("failed to unlock jobs: %s", err)
 	}
 

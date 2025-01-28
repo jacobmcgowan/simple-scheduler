@@ -9,5 +9,6 @@ const (
 	MessageBusConnectionString = "SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING"
 	CleanupInterval            = "SIMPLE_SCHEDULER_CLEANUP_INTERVAL"
 	CacheRefreshInterval       = "SIMPLE_SCHEDULER_CACHE_REFRESH_INTERVAL"
+	HeartbeatTimeout           = "SIMPLE_SCHEDULER_HEARTBEAT_TIMEOUT"
 	ApiUrl                     = "SIMPLE_SCHEDULER_API_URL"
 )

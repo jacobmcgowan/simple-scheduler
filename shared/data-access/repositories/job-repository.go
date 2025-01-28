@@ -9,5 +9,5 @@ type JobRepository interface {
 	Add(job dtos.Job) (string, error)
 	Delete(name string) error
 	Lock(filter dtos.JobLockFilter) ([]dtos.Job, error)
-	Unlock(filter dtos.JobUnlockFilter) error
+	Unlock(filter dtos.JobUnlockFilter) (int64, error)
 }

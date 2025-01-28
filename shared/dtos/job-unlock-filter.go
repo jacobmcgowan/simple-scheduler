@@ -1,6 +1,10 @@
 package dtos
 
+import "time"
+
 type JobUnlockFilter struct {
-	ManagerId string
-	JobNames  []string
+	IsManaged       bool
+	HeartbeatBefore *time.Time
+	ManagerId       *string
+	JobNames        []string
 }

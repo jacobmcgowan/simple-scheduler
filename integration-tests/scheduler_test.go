@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -14,53 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/mongodb"
-	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 )
-
-type ContainerResources struct {
-	DbContainer         *mongodb.MongoDBContainer
-	MessageBusContainer *rabbitmq.RabbitMQContainer
-	DbEnv               resources.DbEnv
-	MessageBusEnv       resources.MessageBusEnv
-}
-
-func initContainers(t *testing.T, ctx context.Context) ContainerResources {
-	dbEnv := resources.DbEnv{
-		Type: "mongodb",
-		Name: "simpleSchedulerTests",
-	}
-	msgBusEnv := resources.MessageBusEnv{
-		Type: "rabbitmq",
-	}
-	dbC, err := mongodb.Run(ctx, "mongodb/mongodb-community-server:latest")
-	require.NoError(t, err)
-
-	dbHost, err := dbC.Host(ctx)
-	require.NoError(t, err)
-	dbPort, err := dbC.MappedPort(ctx, "27017")
-	require.NoError(t, err)
-	dbEnv.ConnectionString = fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort.Port())
-
-	rabbitC, err := rabbitmq.Run(
-		ctx,
-		"rabbitmq:3.12.11-management-alpine",
-		rabbitmq.WithAdminUsername("guest"),
-		rabbitmq.WithAdminPassword("guest"),
-	)
-	require.NoError(t, err)
-
-	rabbitConnStr, err := rabbitC.AmqpURL(ctx)
-	require.NoError(t, err)
-	msgBusEnv.ConnectionString = rabbitConnStr
-
-	return ContainerResources{
-		DbContainer:         dbC,
-		MessageBusContainer: rabbitC,
-		DbEnv:               dbEnv,
-		MessageBusEnv:       msgBusEnv,
-	}
-}
 
 func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	t.Parallel()
@@ -104,7 +57,8 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 	}
-	mngr.Start(&wg)
+	err = mngr.Start(&wg)
+	require.NoError(t, err)
 
 	completedRuns := []string{}
 	failedRuns := []string{}
@@ -125,7 +79,8 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 			}
 		},
 	}
-	client.Start(&wg)
+	err = client.Start(&wg)
+	require.NoError(t, err)
 
 	time.Sleep(time.Second * 2)
 
@@ -213,7 +168,8 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
 	}
-	mngr.Start(&wg)
+	err = mngr.Start(&wg)
+	require.NoError(t, err)
 
 	execExpRuns := []string{}
 	client := TestClientWorker{
@@ -229,7 +185,9 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 			execExpRuns = append(execExpRuns, runId)
 		},
 	}
-	client.Start(&wg)
+	err = client.Start(&wg)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second)
 	client.Stop()
 
@@ -301,7 +259,8 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
 	}
-	mngr.Start(&wg)
+	err = mngr.Start(&wg)
+	require.NoError(t, err)
 
 	runs := []string{}
 	client := TestClientWorker{
@@ -317,7 +276,9 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 			runs = append(runs, runId)
 		},
 	}
-	client.Start(&wg)
+	err = client.Start(&wg)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second)
 
 	for _, runId := range runs {
@@ -404,7 +365,8 @@ func TestConcurrentManagerWorkersWithRabbitMQ(t *testing.T) {
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 	}
-	mngrA.Start(&wg)
+	err = mngrA.Start(&wg)
+	require.NoError(t, err)
 
 	mngrB := workers.ManagerWorker{
 		Hostname:             t.Name() + "-managerB",
@@ -416,7 +378,8 @@ func TestConcurrentManagerWorkersWithRabbitMQ(t *testing.T) {
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 	}
-	mngrB.Start(&wg)
+	err = mngrB.Start(&wg)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 50)
 

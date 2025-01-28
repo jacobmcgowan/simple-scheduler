@@ -172,17 +172,18 @@ func (repo MongoJobRepository) Lock(filter dtos.JobLockFilter) ([]dtos.Job, erro
 	return jobs, nil
 }
 
-func (repo MongoJobRepository) Unlock(filter dtos.JobUnlockFilter) error {
+func (repo MongoJobRepository) Unlock(filter dtos.JobUnlockFilter) (int64, error) {
 	filterDoc, err := mongoModels.JobUnlockFilterFromDto(filter)
 	if err != nil {
-		return fmt.Errorf("invalid filter: %s", err)
+		return 0, fmt.Errorf("invalid filter: %s", err)
 	}
 
 	updateDoc := mongoModels.JobUnlock()
 	coll := repo.DbContext.db.Collection(JobsCollection)
-	if _, err = coll.UpdateMany(repo.DbContext.ctx, filterDoc, updateDoc); err != nil {
-		return fmt.Errorf("failed to unlock jobs: %s", err)
+	cur, err := coll.UpdateMany(repo.DbContext.ctx, filterDoc, updateDoc)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unlock jobs: %s", err)
 	}
 
-	return nil
+	return cur.ModifiedCount, nil
 }

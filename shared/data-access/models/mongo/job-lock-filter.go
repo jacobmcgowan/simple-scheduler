@@ -22,17 +22,15 @@ func JobAggregatorFromDto(dto dtos.JobLockFilter, collection string) (mongo.Pipe
 			Value: bson.A{
 				bson.D{{
 					Key: "managerId",
-					Value: bson.D{{
-						Key:   "$eq",
-						Value: objId,
-					}},
+					Value: bson.M{
+						"$eq": objId,
+					},
 				}},
 				bson.D{{
 					Key: "managerId",
-					Value: bson.D{{
-						Key:   "$exists",
-						Value: false,
-					}},
+					Value: bson.M{
+						"$exists": false,
+					},
 				}},
 			},
 		}},
