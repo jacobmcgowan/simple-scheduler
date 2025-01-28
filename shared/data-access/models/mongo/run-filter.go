@@ -2,7 +2,7 @@ package mongoModels
 
 import (
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func RunFilterFromDto(dto dtos.RunFilter) bson.D {

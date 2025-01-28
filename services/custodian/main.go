@@ -10,21 +10,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jacobmcgowan/simple-scheduler/services/scheduler/workers"
+	"github.com/jacobmcgowan/simple-scheduler/services/custodian/workers"
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
 	envVars "github.com/jacobmcgowan/simple-scheduler/shared/resources/env-vars"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	appName := "simple-scheduler"
+	appName := "simple-scheduler-custodian"
 
 	log.Printf("Starting %s...", appName)
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatalf("Failed to get hostname: %s", err)
-	}
 
 	envFilename := ".env"
 	if len(os.Args) > 1 {
@@ -35,25 +30,14 @@ func main() {
 		log.Fatalf("Failed to load environment file, %s", envFilename)
 	}
 
-	maxJobsStr := os.Getenv(envVars.MaxJobs)
-	maxJobs, err := strconv.Atoi(maxJobsStr)
-	if err != nil {
-		log.Fatalf("Invalid value for %s, %s", envVars.MaxJobs, maxJobsStr)
-	}
-
 	refreshInterval, err := strconv.Atoi(os.Getenv(envVars.CacheRefreshInterval))
 	if err != nil || refreshInterval < 1 {
 		log.Fatalf("Cache refresh interval invalid")
 	}
 
-	cleanupInterval, err := strconv.Atoi(os.Getenv(envVars.CleanupInterval))
-	if err != nil || cleanupInterval < 1 {
-		log.Fatalf("Cleanup interval invalid")
-	}
-
-	hrtbtInterval, err := strconv.Atoi(os.Getenv(envVars.HeartbeatInterval))
-	if err != nil || hrtbtInterval < 1 {
-		log.Fatalf("Heartbeat interval invalid")
+	hrtbtTimeout, err := strconv.Atoi(os.Getenv(envVars.HeartbeatTimeout))
+	if err != nil || hrtbtTimeout < 1 {
+		log.Fatalf("Heartbeat timeout invalid")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -86,23 +70,18 @@ func main() {
 	log.Println("Connected to message bus")
 
 	wg := sync.WaitGroup{}
-	manager := workers.ManagerWorker{
-		Hostname:             hostname,
-		MaxJobs:              maxJobs,
-		MessageBus:           msgBusResources.MessageBus,
-		ManagerRepo:          dbResources.ManagerRepo,
-		JobRepo:              dbResources.JobRepo,
-		RunRepo:              dbResources.RunRepo,
-		CacheRefreshDuration: time.Duration(int(time.Millisecond) * refreshInterval),
-		CleanupDuration:      time.Duration(int(time.Millisecond) * cleanupInterval),
-		HeartbeatDuration:    time.Duration(int(time.Millisecond) * hrtbtInterval),
+	cust := workers.JobCustodian{
+		MessageBus:       msgBusResources.MessageBus,
+		JobRepo:          dbResources.JobRepo,
+		Duration:         time.Duration(refreshInterval) * time.Second,
+		HeartbeatTimeout: time.Duration(hrtbtTimeout) * time.Second,
 	}
 
-	manager.Start(&wg)
+	cust.Start(&wg)
 
 	log.Printf("Started %s", appName)
 
 	<-ctx.Done()
-	manager.Stop()
+	cust.Stop()
 	wg.Wait()
 }

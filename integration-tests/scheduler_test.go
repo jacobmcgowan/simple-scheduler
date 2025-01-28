@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -14,55 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/mongodb"
-	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 )
 
-type ContainerResources struct {
-	DbContainer         *mongodb.MongoDBContainer
-	MessageBusContainer *rabbitmq.RabbitMQContainer
-	DbEnv               resources.DbEnv
-	MessageBusEnv       resources.MessageBusEnv
-}
-
-func initContainers(t *testing.T, ctx context.Context) ContainerResources {
-	dbEnv := resources.DbEnv{
-		Type: "mongodb",
-		Name: "simpleSchedulerTests",
-	}
-	msgBusEnv := resources.MessageBusEnv{
-		Type: "rabbitmq",
-	}
-	dbC, err := mongodb.Run(ctx, "mongodb/mongodb-community-server:latest")
-	require.NoError(t, err)
-
-	dbHost, err := dbC.Host(ctx)
-	require.NoError(t, err)
-	dbPort, err := dbC.MappedPort(ctx, "27017")
-	require.NoError(t, err)
-	dbEnv.ConnectionString = fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort.Port())
-
-	rabbitC, err := rabbitmq.Run(
-		ctx,
-		"rabbitmq:3.12.11-management-alpine",
-		rabbitmq.WithAdminUsername("guest"),
-		rabbitmq.WithAdminPassword("guest"),
-	)
-	require.NoError(t, err)
-
-	rabbitConnStr, err := rabbitC.AmqpURL(ctx)
-	require.NoError(t, err)
-	msgBusEnv.ConnectionString = rabbitConnStr
-
-	return ContainerResources{
-		DbContainer:         dbC,
-		MessageBusContainer: rabbitC,
-		DbEnv:               dbEnv,
-		MessageBusEnv:       msgBusEnv,
-	}
-}
-
-func TestRecurringJobWithRabbitMQ(t *testing.T) {
+func TestRecurringJob(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -94,14 +47,19 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
-	manager := workers.ManagerWorker{
+	mngr := workers.ManagerWorker{
+		Hostname:             t.Name() + "-manager",
+		MaxJobs:              0,
 		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
-	manager.Start(&wg)
+	err = mngr.Start(&wg)
+	require.NoError(t, err)
 
 	completedRuns := []string{}
 	failedRuns := []string{}
@@ -122,7 +80,8 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 			}
 		},
 	}
-	client.Start(&wg)
+	err = client.Start(&wg)
+	require.NoError(t, err)
 
 	time.Sleep(time.Second * 2)
 
@@ -161,12 +120,12 @@ func TestRecurringJobWithRabbitMQ(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, runs, 2)
 
-	manager.Stop()
+	mngr.Stop()
 	client.Stop()
 	wg.Wait()
 }
 
-func TestRunCleanupWithRabbitMQ(t *testing.T) {
+func TestRunCleanup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -200,14 +159,19 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
-	manager := workers.ManagerWorker{
+	mngr := workers.ManagerWorker{
+		Hostname:             t.Name() + "-manager",
+		MaxJobs:              0,
 		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
-	manager.Start(&wg)
+	err = mngr.Start(&wg)
+	require.NoError(t, err)
 
 	execExpRuns := []string{}
 	client := TestClientWorker{
@@ -223,7 +187,9 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 			execExpRuns = append(execExpRuns, runId)
 		},
 	}
-	client.Start(&wg)
+	err = client.Start(&wg)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second)
 	client.Stop()
 
@@ -247,12 +213,12 @@ func TestRunCleanupWithRabbitMQ(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, len(cancelledRuns), len(execExpRuns))
 
-	manager.Stop()
+	mngr.Stop()
 	client.Stop()
 	wg.Wait()
 }
 
-func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
+func TestRunHeartbeat(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -285,14 +251,19 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
-	manager := workers.ManagerWorker{
+	mngr := workers.ManagerWorker{
+		Hostname:             t.Name() + "-manager",
+		MaxJobs:              0,
 		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
 		JobRepo:              dbResources.JobRepo,
 		RunRepo:              dbResources.RunRepo,
 		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
 		CleanupDuration:      time.Second,
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
-	manager.Start(&wg)
+	err = mngr.Start(&wg)
+	require.NoError(t, err)
 
 	runs := []string{}
 	client := TestClientWorker{
@@ -308,7 +279,9 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 			runs = append(runs, runId)
 		},
 	}
-	client.Start(&wg)
+	err = client.Start(&wg)
+	require.NoError(t, err)
+
 	time.Sleep(time.Second)
 
 	for _, runId := range runs {
@@ -326,6 +299,140 @@ func TestRunHeartbeatWithRabbitMQ(t *testing.T) {
 		require.Equal(t, runStatuses.Pending, run.Status)
 	}
 
-	manager.Stop()
+	mngr.Stop()
 	wg.Wait()
+}
+
+func TestConcurrentManagerWorkers(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cRes := initContainers(t, ctx)
+	defer testcontainers.TerminateContainer(cRes.DbContainer)
+	defer testcontainers.TerminateContainer(cRes.MessageBusContainer)
+
+	dbResources, err := resources.RegisterRepos(cRes.DbEnv)
+	require.NoError(t, err)
+
+	err = dbResources.Context.Connect(ctx)
+	require.NoError(t, err)
+	defer dbResources.Context.Disconnect()
+
+	msgBusResources, err := resources.RegisterMessageBus(cRes.MessageBusEnv)
+	require.NoError(t, err)
+
+	err = msgBusResources.MessageBus.Connect()
+	require.NoError(t, err)
+	defer msgBusResources.MessageBus.Close()
+
+	jobs := []dtos.Job{
+		{
+			Name:      t.Name() + "-jobA",
+			Enabled:   true,
+			NextRunAt: time.Now().Add(time.Second),
+			Interval:  1000,
+		},
+		{
+			Name:      t.Name() + "-jobB",
+			Enabled:   true,
+			NextRunAt: time.Now().Add(time.Second),
+			Interval:  1000,
+		},
+		{
+			Name:      t.Name() + "-jobC",
+			Enabled:   true,
+			NextRunAt: time.Now().Add(time.Second),
+			Interval:  1000,
+		},
+		{
+			Name:      t.Name() + "-jobD",
+			Enabled:   true,
+			NextRunAt: time.Now().Add(time.Second),
+			Interval:  1000,
+		},
+	}
+
+	for _, job := range jobs {
+		_, err := dbResources.JobRepo.Add(job)
+		require.NoError(t, err)
+	}
+
+	wg := sync.WaitGroup{}
+	mngrA := workers.ManagerWorker{
+		Hostname:             t.Name() + "-managerA",
+		MaxJobs:              2,
+		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
+		JobRepo:              dbResources.JobRepo,
+		RunRepo:              dbResources.RunRepo,
+		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
+		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
+	}
+	err = mngrA.Start(&wg)
+	require.NoError(t, err)
+
+	mngrB := workers.ManagerWorker{
+		Hostname:             t.Name() + "-managerB",
+		MaxJobs:              1,
+		MessageBus:           msgBusResources.MessageBus,
+		ManagerRepo:          dbResources.ManagerRepo,
+		JobRepo:              dbResources.JobRepo,
+		RunRepo:              dbResources.RunRepo,
+		CacheRefreshDuration: time.Minute * 1000, // Prevent cache refresh
+		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
+		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
+	}
+	err = mngrB.Start(&wg)
+	require.NoError(t, err)
+
+	time.Sleep(time.Millisecond * 50)
+
+	updatedJobs, err := dbResources.JobRepo.Browse()
+	require.NoError(t, err)
+
+	mngrAJobs := []string{}
+	mngrBJobs := []string{}
+	unmngedJobs := []string{}
+
+	for _, job := range updatedJobs {
+		if job.ManagerId == mngrA.Id {
+			mngrAJobs = append(mngrAJobs, job.Name)
+		} else if job.ManagerId == mngrB.Id {
+			mngrBJobs = append(mngrBJobs, job.Name)
+		} else {
+			unmngedJobs = append(unmngedJobs, job.Name)
+		}
+	}
+
+	require.Len(t, mngrAJobs, 2)
+	require.Len(t, mngrBJobs, 1)
+	require.Len(t, unmngedJobs, 1)
+
+	mngrA.Stop()
+	mngrB.Stop()
+	wg.Wait()
+
+	time.Sleep(time.Millisecond * 50)
+
+	updatedJobs, err = dbResources.JobRepo.Browse()
+	require.NoError(t, err)
+
+	mngrAJobs = []string{}
+	mngrBJobs = []string{}
+	unmngedJobs = []string{}
+
+	for _, job := range updatedJobs {
+		if job.ManagerId == mngrA.Id {
+			mngrAJobs = append(mngrAJobs, job.Name)
+		} else if job.ManagerId == mngrB.Id {
+			mngrBJobs = append(mngrBJobs, job.Name)
+		} else {
+			unmngedJobs = append(unmngedJobs, job.Name)
+		}
+	}
+
+	require.Len(t, mngrAJobs, 0)
+	require.Len(t, mngrBJobs, 0)
+	require.Len(t, unmngedJobs, 4)
 }

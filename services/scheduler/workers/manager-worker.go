@@ -1,21 +1,28 @@
 package workers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
+	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
 )
 
 type ManagerWorker struct {
+	Id                   string
+	Hostname             string
+	MaxJobs              int
 	MessageBus           messageBus.MessageBus
+	ManagerRepo          repositories.ManagerRepository
 	JobRepo              repositories.JobRepository
 	RunRepo              repositories.RunRepository
 	CacheRefreshDuration time.Duration
 	CleanupDuration      time.Duration
+	HeartbeatDuration    time.Duration
 	nextCacheRefreshAt   time.Time
 	jobs                 map[string]*JobWorker
 	custodians           map[string]*RunCustodian
@@ -24,15 +31,19 @@ type ManagerWorker struct {
 	isRunning            bool
 }
 
-func (worker *ManagerWorker) Start(wg *sync.WaitGroup) {
+func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
 
 	if worker.isRunning {
-		return
+		return nil
 	}
 
-	log.Println("Starting job manager...")
+	log.Printf("Starting job manager @%s...\n", worker.Hostname)
+	if err := worker.registerWorker(); err != nil {
+		return fmt.Errorf("failed to start job manager @%s: %s", worker.Hostname, err)
+	}
+
 	worker.jobs = make(map[string]*JobWorker)
 	worker.custodians = make(map[string]*RunCustodian)
 	worker.quit = make(chan struct{})
@@ -40,27 +51,50 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) {
 
 	go worker.process(wg)
 	worker.isRunning = true
-	log.Println("Started job manager")
+	log.Printf("Started job manager %s@%s\n", worker.Id, worker.Hostname)
+
+	return nil
 }
 
 func (worker *ManagerWorker) Stop() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
 
-	log.Println("Stopping job manager...")
+	log.Printf("Stopping job manager %s@%s...\n", worker.Id, worker.Hostname)
 	worker.quit <- struct{}{}
 	worker.isRunning = false
+}
+
+func (worker *ManagerWorker) registerWorker() error {
+	log.Printf("Registering job manager @%s...\n", worker.Hostname)
+	mngr := dtos.Manager{
+		Hostname: worker.Hostname,
+	}
+	id, err := worker.ManagerRepo.Add(mngr)
+	if err != nil {
+		return fmt.Errorf("failed to register manager @%s: %s", worker.Hostname, err)
+	}
+
+	log.Printf("Registered job manager %s@%s\n", id, worker.Hostname)
+
+	worker.Id = id
+	return nil
 }
 
 func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	worker.nextCacheRefreshAt = time.Now().Add(worker.CacheRefreshDuration)
 	refreshedJobs := make(map[string]bool)
-	jobs, err := worker.JobRepo.Browse()
+	filter := dtos.JobLockFilter{
+		ManagerId: worker.Id,
+		Take:      worker.MaxJobs,
+	}
+	jobs, err := worker.JobRepo.Lock(filter)
 	if err != nil {
 		return fmt.Errorf("failed to get jobs: %s", err)
 	}
 
 	for _, job := range jobs {
+		log.Printf("Locked job %s for manager %s@%s\n", job.Name, worker.Id, worker.Hostname)
 		jobWorker, found := worker.jobs[job.Name]
 		if found {
 			jobWorker.Job = job
@@ -88,11 +122,16 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 		refreshedJobs[job.Name] = true
 	}
 
+	jobErrs := []error{}
+	unlockJobNames := []string{}
 	for name, job := range worker.jobs {
 		_, refreshed := refreshedJobs[name]
 		if refreshed {
-			job.Start(wg)
+			if err = job.Start(wg); err != nil {
+				jobErrs = append(jobErrs, fmt.Errorf("failed to start job %s: %s", name, err))
+			}
 		} else {
+			unlockJobNames = append(unlockJobNames, job.Job.Name)
 			job.Stop()
 			delete(worker.jobs, name)
 		}
@@ -101,17 +140,39 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	for name, custodian := range worker.custodians {
 		_, refreshed := refreshedJobs[name]
 		if refreshed {
-			custodian.Start(wg)
+			if err = custodian.Start(wg); err != nil {
+				jobErrs = append(jobErrs, fmt.Errorf("failed to start custodian for job %s: %s", name, err))
+			}
 		} else {
 			custodian.Stop()
 			delete(worker.custodians, name)
 		}
 	}
 
+	unlockFilter := dtos.JobUnlockFilter{
+		ManagerId: &worker.Id,
+		JobNames:  unlockJobNames,
+	}
+	if _, err = worker.JobRepo.Unlock(unlockFilter); err != nil {
+		jobErrs = append(jobErrs, fmt.Errorf("failed to unlock jobs: %s", err))
+	}
+
+	if len(jobErrs) > 0 {
+		return errors.Join(jobErrs...)
+	}
+
 	return nil
 }
 
-func (worker *ManagerWorker) stopAllJobs() {
+func (worker *ManagerWorker) setHeartbeat() error {
+	if err := worker.JobRepo.Heartbeat(worker.Id); err != nil {
+		return fmt.Errorf("failed to set heartbeat: %s", err)
+	}
+
+	return nil
+}
+
+func (worker *ManagerWorker) stopAllJobs() error {
 	for name, job := range worker.jobs {
 		job.Stop()
 		delete(worker.jobs, name)
@@ -121,6 +182,15 @@ func (worker *ManagerWorker) stopAllJobs() {
 		custodian.Stop()
 		delete(worker.custodians, name)
 	}
+
+	unlockFilter := dtos.JobUnlockFilter{
+		ManagerId: &worker.Id,
+	}
+	if _, err := worker.JobRepo.Unlock(unlockFilter); err != nil {
+		return fmt.Errorf("failed to unlock jobs: %s", err)
+	}
+
+	return nil
 }
 
 func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
@@ -130,8 +200,11 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-worker.quit:
-			worker.stopAllJobs()
-			log.Println("Stopped job manager")
+			if err := worker.stopAllJobs(); err != nil {
+				log.Printf("Error occurred when stopping jobs: %s", err)
+			}
+
+			log.Printf("Stopped job manager %s@%s\n", worker.Id, worker.Hostname)
 			return
 		case <-time.After(time.Until(worker.nextCacheRefreshAt)):
 			log.Println("Refreshing jobs cache...")
@@ -139,6 +212,13 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 				log.Printf("Failed to refresh jobs cache: %s", err)
 			} else {
 				log.Printf("Refreshed jobs cache, %d loaded", len(worker.jobs))
+			}
+		case <-time.After(worker.HeartbeatDuration):
+			log.Println("Setting heartbeat of jobs...")
+			if err := worker.setHeartbeat(); err != nil {
+				log.Printf("Failed to set heartbeat: %s", err)
+			} else {
+				log.Println("Set heartbeat of jobs")
 			}
 		}
 	}

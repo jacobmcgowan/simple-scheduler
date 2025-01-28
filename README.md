@@ -46,6 +46,19 @@ docker build -f ./services/api/Dockerfile -t simple-scheduler/scheduler .
 docker run -it --rm --name simple-scheduler -p 8080:8080 simple-scheduler/scheduler:latest
 ```
 
+#### Settings
+The scheduler supports the following settings set in the .env file:
+| Environment Variable                          | Description                                                                                |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------|
+| SIMPLE_SCHEDULER_MAX_JOBS                     | The maximum number of jobs the scheduler instance will manage. If 0, then no limit is set. |
+| SIMPLE_SCHEDULER_DB_TYPE                      | The type of database to use. e.g. mongodb.                                                 |
+| SIMPLE_SCHEDULER_MESSAGEBUS_TYPE              | The type of message bus to use. e.g. rabbitmq.                                             |
+| SIMPLE_SCHEDULER_DB_CONNECTION_STRING         | The connection string of the database.                                                     |
+| SIMPLE_SCHEDULER_DB_NAME                      | The name of the database to connect to.                                                    |
+| SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING | The connection string of the message bus.                                                  |
+| SIMPLE_SCHEDULER_CLEANUP_INTERVAL             | The interval in milliseconds to cleanup stuck runs.                                        |
+| SIMPLE_SCHEDULER_CACHE_REFRESH_INTERVAL       | The interval in milliseconds to refresh the job cache.                                     |
+
 ### API
 This service provides a RESTful API to manage jobs and runs.
 

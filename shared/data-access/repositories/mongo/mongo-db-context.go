@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type MongoDbContext struct {
@@ -22,7 +22,7 @@ func (dbContext *MongoDbContext) Connect(ctx context.Context) error {
 	}
 
 	dbContext.ctx = ctx
-	client, err := mongo.Connect(dbContext.ctx, &dbContext.Options)
+	client, err := mongo.Connect(&dbContext.Options)
 	if err != nil {
 		return fmt.Errorf("failed to connect to MongoDB: %s", err)
 	}

@@ -5,17 +5,17 @@ import (
 
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 	"github.com/jacobmcgowan/simple-scheduler/shared/runStatuses"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Run struct {
-	Id          primitive.ObjectID `bson:"_id,omitempty"`
-	JobName     string             `bson:"jobName"`
-	Status      string             `bson:"status"`
-	CreatedTime time.Time          `bson:"createdTime"`
-	StartTime   time.Time          `bson:"startTime"`
-	EndTime     time.Time          `bson:"endTime"`
-	Heartbeat   time.Time          `bson:"heartbeat"`
+	Id          bson.ObjectID `bson:"_id,omitempty"`
+	JobName     string        `bson:"jobName"`
+	Status      string        `bson:"status"`
+	CreatedTime time.Time     `bson:"createdTime"`
+	StartTime   time.Time     `bson:"startTime"`
+	EndTime     time.Time     `bson:"endTime"`
+	Heartbeat   time.Time     `bson:"heartbeat"`
 }
 
 func (run Run) ToDto() dtos.Run {
@@ -31,9 +31,9 @@ func (run Run) ToDto() dtos.Run {
 }
 
 func (run *Run) FromDto(dto dtos.Run) {
-	id, err := primitive.ObjectIDFromHex(dto.Id)
+	id, err := bson.ObjectIDFromHex(dto.Id)
 	if err != nil {
-		id = primitive.NilObjectID
+		id = bson.NilObjectID
 	}
 
 	run.Id = id

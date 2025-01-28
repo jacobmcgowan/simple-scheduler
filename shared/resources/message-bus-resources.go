@@ -8,6 +8,7 @@ import (
 	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
 	messageBusTypes "github.com/jacobmcgowan/simple-scheduler/shared/message-bus/message-bus-types"
 	"github.com/jacobmcgowan/simple-scheduler/shared/message-bus/rabbitmqMessageBus"
+	envVars "github.com/jacobmcgowan/simple-scheduler/shared/resources/env-vars"
 )
 
 type MessageBusEnv struct {
@@ -22,8 +23,8 @@ type MessageBusResources struct {
 
 func LoadMessageBusEnv() MessageBusEnv {
 	return MessageBusEnv{
-		Type:             os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_TYPE"),
-		ConnectionString: os.Getenv("SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING"),
+		Type:             os.Getenv(envVars.MessageBusType),
+		ConnectionString: os.Getenv(envVars.MessageBusConnectionString),
 	}
 }
 
