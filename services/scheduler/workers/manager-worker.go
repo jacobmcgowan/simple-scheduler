@@ -51,7 +51,7 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
 
 	go worker.process(wg)
 	worker.isRunning = true
-	log.Printf("Started job manager %s@%s\n", worker.Id, worker.Hostname)
+	log.Printf("Started job manager %s@%s", worker.Id, worker.Hostname)
 
 	return nil
 }
@@ -60,13 +60,13 @@ func (worker *ManagerWorker) Stop() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
 
-	log.Printf("Stopping job manager %s@%s...\n", worker.Id, worker.Hostname)
+	log.Printf("Stopping job manager %s@%s...", worker.Id, worker.Hostname)
 	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
 func (worker *ManagerWorker) registerWorker() error {
-	log.Printf("Registering job manager @%s...\n", worker.Hostname)
+	log.Printf("Registering job manager @%s...", worker.Hostname)
 	mngr := dtos.Manager{
 		Hostname: worker.Hostname,
 	}
@@ -75,7 +75,7 @@ func (worker *ManagerWorker) registerWorker() error {
 		return fmt.Errorf("failed to register manager @%s: %s", worker.Hostname, err)
 	}
 
-	log.Printf("Registered job manager %s@%s\n", id, worker.Hostname)
+	log.Printf("Registered job manager %s@%s", id, worker.Hostname)
 
 	worker.Id = id
 	return nil
@@ -94,7 +94,7 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 	}
 
 	for _, job := range jobs {
-		log.Printf("Locked job %s for manager %s@%s\n", job.Name, worker.Id, worker.Hostname)
+		log.Printf("Locked job %s for manager %s@%s", job.Name, worker.Id, worker.Hostname)
 		jobWorker, found := worker.jobs[job.Name]
 		if found {
 			jobWorker.Job = job
@@ -149,12 +149,17 @@ func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
 		}
 	}
 
-	unlockFilter := dtos.JobUnlockFilter{
-		ManagerId: &worker.Id,
-		JobNames:  unlockJobNames,
-	}
-	if _, err = worker.JobRepo.Unlock(unlockFilter); err != nil {
-		jobErrs = append(jobErrs, fmt.Errorf("failed to unlock jobs: %s", err))
+	if len(unlockJobNames) > 0 {
+		unlockFilter := dtos.JobUnlockFilter{
+			ManagerId: &worker.Id,
+			JobNames:  unlockJobNames,
+		}
+
+		if unlockCount, err := worker.JobRepo.Unlock(unlockFilter); err != nil {
+			jobErrs = append(jobErrs, fmt.Errorf("failed to unlock jobs: %s", err))
+		} else {
+			log.Printf("Unlocked %d jobs for manager %s@%s\n", unlockCount, worker.Id, worker.Hostname)
+		}
 	}
 
 	if len(jobErrs) > 0 {
@@ -201,24 +206,24 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 		select {
 		case <-worker.quit:
 			if err := worker.stopAllJobs(); err != nil {
-				log.Printf("Error occurred when stopping jobs: %s", err)
+				log.Printf("Error occurred when stopping jobs for manager %s@%s: %s", worker.Id, worker.Hostname, err)
 			}
 
 			log.Printf("Stopped job manager %s@%s\n", worker.Id, worker.Hostname)
 			return
 		case <-time.After(time.Until(worker.nextCacheRefreshAt)):
-			log.Println("Refreshing jobs cache...")
+			log.Printf("Refreshing jobs cache for manager %s@%s...", worker.Id, worker.Hostname)
 			if err := worker.refreshCache(wg); err != nil {
-				log.Printf("Failed to refresh jobs cache: %s", err)
+				log.Printf("Failed to refresh jobs cache for manager %s@%s: %s", worker.Id, worker.Hostname, err)
 			} else {
-				log.Printf("Refreshed jobs cache, %d loaded", len(worker.jobs))
+				log.Printf("Refreshed jobs cache, %d loaded, for manager %s@%s", len(worker.jobs), worker.Id, worker.Hostname)
 			}
 		case <-time.After(worker.HeartbeatDuration):
-			log.Println("Setting heartbeat of jobs...")
+			log.Printf("Setting heartbeat of jobs for manager %s@%s...", worker.Id, worker.Hostname)
 			if err := worker.setHeartbeat(); err != nil {
-				log.Printf("Failed to set heartbeat: %s", err)
+				log.Printf("Failed to set heartbeat for manager %s@%s: %s", worker.Id, worker.Hostname, err)
 			} else {
-				log.Println("Set heartbeat of jobs")
+				log.Printf("Set heartbeat of jobs for manager %s@%s", worker.Id, worker.Hostname)
 			}
 		}
 	}
