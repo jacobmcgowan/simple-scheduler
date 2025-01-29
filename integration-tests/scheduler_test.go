@@ -369,8 +369,6 @@ func TestConcurrentManagerWorkers(t *testing.T) {
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
-	err = mngrA.Start(&wg)
-	require.NoError(t, err)
 
 	mngrB := workers.ManagerWorker{
 		Hostname:             t.Name() + "-managerB",
@@ -383,6 +381,9 @@ func TestConcurrentManagerWorkers(t *testing.T) {
 		CleanupDuration:      time.Minute * 1000, // Prevent cleanup
 		HeartbeatDuration:    time.Minute * 1000, // Prevent heartbeat
 	}
+
+	err = mngrA.Start(&wg)
+	require.NoError(t, err)
 	err = mngrB.Start(&wg)
 	require.NoError(t, err)
 
