@@ -17,7 +17,7 @@ runs.
 Execution for runs is handled via a message bus using a pub/sub model. When the
 Scheduler starts a run of a job it publishes a message to start the job. It is
 assumed that a job worker service will consume this message then perform its
-task. The job worker should publish status messages that the scheduler will
+task. The job worker should publish status messages that the Scheduler will
 consume to update the run's status.
 
 Currently, RabbitMQ is the only supported message bus but other options may be
@@ -95,7 +95,7 @@ Lastly, update [RegisterMessageBus()](https://github.com/jacobmcgowan/simple-sch
 to support the configuration option to use the new message bus service.
 
 #### Running
-The scheduler currently has the following dependencies:
+The Scheduler currently has the following dependencies:
 - [MongoDB](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-community-with-docker/)
 - [RabbitMQ](https://www.rabbitmq.com/docs/download)
 
@@ -108,12 +108,12 @@ go build .
 
 or run in Docker using
 ```bash
-docker build -f ./services/api/Dockerfile -t simple-scheduler/scheduler .
+docker build -f ./services/scheduler/Dockerfile -t simple-scheduler/scheduler .
 docker run -it --rm --name simple-scheduler -p 8080:8080 simple-scheduler/scheduler:latest
 ```
 
 #### Settings
-The scheduler supports the following settings set in the .env file:
+The Scheduler supports the following settings set in the .env file:
 
 | Environment Variable                          | Description                                                                                |
 |-----------------------------------------------|--------------------------------------------------------------------------------------------|
@@ -125,11 +125,40 @@ The scheduler supports the following settings set in the .env file:
 | SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING | The connection string of the message bus.                                                  |
 | SIMPLE_SCHEDULER_CLEANUP_INTERVAL             | The interval in milliseconds to cleanup stuck runs.                                        |
 | SIMPLE_SCHEDULER_CACHE_REFRESH_INTERVAL       | The interval in milliseconds to refresh the job cache.                                     |
+| SIMPLE_SCHEDULER_HEARTBEAT_INTERVAL           | The interval in milliseconds to set the heartbeat for locked jobs.                         |
 
 ### Custodian
 This service cleans up locked jobs in the event that an instance of the
-scheduler service crashes or stops unexpectedly without unlocking the jobs it
-was managing first.
+Scheduler service crashes or stops unexpectedly without unlocking the jobs it
+was managing.
+
+#### Running
+The Custodian currently has the following dependencies:
+- [MongoDB](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-community-with-docker/)
+
+Once the dependencies are running, you can run the service locally using
+```bash
+cd services/custodian
+go build .
+./custodian
+```
+
+or run in Docker using
+```bash
+docker build -f ./services/custodian/Dockerfile -t simple-scheduler/custodian .
+docker run -it --rm --name simple-scheduler-custodian -p 8080:8080 simple-scheduler/custodian:latest
+```
+
+#### Settings
+The Scheduler supports the following settings set in the .env file:
+
+| Environment Variable                          | Description                                                                                |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------|
+| SIMPLE_SCHEDULER_DB_TYPE                      | The type of database to use. e.g. `mongodb`.                                               |
+| SIMPLE_SCHEDULER_DB_CONNECTION_STRING         | The connection string of the database.                                                     |
+| SIMPLE_SCHEDULER_DB_NAME                      | The name of the database to connect to.                                                    |
+| SIMPLE_SCHEDULER_CLEANUP_INTERVAL             | The interval in milliseconds to cleanup stuck jobs.                                        |
+| SIMPLE_SCHEDULER_HEARTBEAT_TIMEOUT            | The time period in milliseconds to wait for a heartbeat before unlocking a job.            |
 
 ### API
 This service provides a RESTful API to manage jobs and runs.

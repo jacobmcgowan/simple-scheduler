@@ -8,11 +8,9 @@ import (
 
 	"github.com/jacobmcgowan/simple-scheduler/shared/data-access/repositories"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
-	messageBus "github.com/jacobmcgowan/simple-scheduler/shared/message-bus"
 )
 
 type JobCustodian struct {
-	MessageBus       messageBus.MessageBus
 	JobRepo          repositories.JobRepository
 	Duration         time.Duration
 	HeartbeatTimeout time.Duration
