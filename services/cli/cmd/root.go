@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 )
 
 var ApiUrl string
@@ -20,6 +21,10 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func GenMarkdownTree(path string) error {
+	return doc.GenMarkdownTree(rootCmd, path)
 }
 
 func init() {

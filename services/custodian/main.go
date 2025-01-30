@@ -56,22 +56,8 @@ func main() {
 	defer dbResources.Context.Disconnect()
 	log.Println("Connected to database")
 
-	msgBusEnv := resources.LoadMessageBusEnv()
-	msgBusResources, err := resources.RegisterMessageBus(msgBusEnv)
-	if err != nil {
-		log.Fatalf("Failed to register message bus: %s", err)
-	}
-
-	log.Printf("Connecting to message bus %s...", msgBusResources.Name)
-	if err = msgBusResources.MessageBus.Connect(); err != nil {
-		log.Fatalf("Failed to connect to message bus: %s", err)
-	}
-	defer msgBusResources.MessageBus.Close()
-	log.Println("Connected to message bus")
-
 	wg := sync.WaitGroup{}
 	cust := workers.JobCustodian{
-		MessageBus:       msgBusResources.MessageBus,
 		JobRepo:          dbResources.JobRepo,
 		Duration:         time.Duration(refreshInterval) * time.Second,
 		HeartbeatTimeout: time.Duration(hrtbtTimeout) * time.Second,

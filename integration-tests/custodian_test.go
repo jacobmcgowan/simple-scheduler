@@ -29,10 +29,6 @@ func TestHeartbeat(t *testing.T) {
 	require.NoError(t, err)
 	defer dbResources.Context.Disconnect()
 
-	msgBusResources, err := resources.RegisterMessageBus(cRes.MessageBusEnv)
-	require.NoError(t, err)
-	defer msgBusResources.MessageBus.Close()
-
 	nilMngrId := bson.NilObjectID.Hex()
 	mngrId := bson.NewObjectID().Hex()
 	now := time.Now()
@@ -61,7 +57,6 @@ func TestHeartbeat(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	cust := workers.JobCustodian{
-		MessageBus:       msgBusResources.MessageBus,
 		JobRepo:          dbResources.JobRepo,
 		Duration:         time.Second,
 		HeartbeatTimeout: time.Second,
