@@ -204,3 +204,7 @@ cd services/cli
 go build .
 ./cli --help
 ```
+
+#### Commands
+See [simple-scheduler-cli](services/cli/docs/simple-scheduler-cli.md) for
+documentation on commands.
