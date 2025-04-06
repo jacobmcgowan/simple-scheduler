@@ -34,11 +34,11 @@ var addJobCmd = &cobra.Command{
 			AllowConcurrentRuns: addJobOptions.AllowConcurrentRuns,
 			HeartbeatTimeout:    addJobOptions.HeartbeatTimeout,
 		}
-		svc := services.JobService{
+		jobSvc := services.JobService{
 			ApiUrl: ApiUrl,
 		}
 
-		if _, err := svc.Add(job); err != nil {
+		if _, err := jobSvc.Add(job); err != nil {
 			return fmt.Errorf("failed to add job: %s", err)
 		}
 

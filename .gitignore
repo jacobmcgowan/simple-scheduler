@@ -20,3 +20,4 @@
 # Go workspace file
 go.work
 go.work.sum
+services/api/oauth2-local-creds.json
