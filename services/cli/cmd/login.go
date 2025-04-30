@@ -1,10 +1,9 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/jacobmcgowan/simple-scheduler/services/cli/cmd/options"
 	"github.com/jacobmcgowan/simple-scheduler/services/cli/services"
@@ -13,21 +12,27 @@ import (
 
 var loginOptions = options.LoginOptions{}
 
-// loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:     "login",
 	Aliases: []string{"l"},
 	Short:   "Logins into the Simple Scheduler API",
 	Long:    `Logs into the Simple Scheduler API using OIDC.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		wg := sync.WaitGroup{}
 		authSvc := services.AuthService{
 			ApiUrl: ApiUrl,
 		}
-		if err := authSvc.Init(cmd.Context(), loginOptions.ClientId, loginOptions.ClientSecret, loginOptions.ProviderType); err != nil {
-			return fmt.Errorf("failed to initialize auth service: %s", err)
+		if err := authSvc.Start(cmd.Context(), loginOptions.ClientId, loginOptions.ClientSecret, loginOptions.ProviderType, &wg); err != nil {
+			return fmt.Errorf("failed to start auth service: %s", err)
 		}
 		if err := authSvc.Login(); err != nil {
 			return fmt.Errorf("failed to login: %s", err)
+		}
+
+		time.Sleep(30 * time.Second)
+
+		if err := authSvc.Stop(); err != nil {
+			return fmt.Errorf("failed to stop auth service: %s", err)
 		}
 
 		return nil
