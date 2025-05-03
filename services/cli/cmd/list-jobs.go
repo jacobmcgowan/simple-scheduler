@@ -14,9 +14,16 @@ var jobsCmd = &cobra.Command{
 	Aliases: []string{"j"},
 	Short:   "Lists the jobs",
 	Long:    `Provides details on the current jobs that are scheduled.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		authSvc := services.AuthService{}
+		token, err := authSvc.GetAccessToken()
+		if err != nil {
+			return fmt.Errorf("failed to get access token: %s", err)
+		}
+
 		svc := services.JobService{
-			ApiUrl: ApiUrl,
+			ApiUrl:      ApiUrl,
+			AccessToken: token,
 		}
 
 		if jobs, err := svc.Browse(); err == nil {
@@ -42,8 +49,10 @@ var jobsCmd = &cobra.Command{
 
 			writer.Flush()
 		} else {
-			fmt.Printf("Failed to get runs: %s", err)
+			return fmt.Errorf("failed to get runs: %s", err)
 		}
+
+		return nil
 	},
 }
 

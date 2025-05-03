@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	authProviderTypes "github.com/jacobmcgowan/simple-scheduler/shared/auth/auth-provider-types"
 	"golang.org/x/oauth2"
@@ -25,9 +28,13 @@ type AuthService struct {
 	oauth2Config oauth2.Config
 	verifier     string
 	server       http.Server
+	state        string
+	loggedId     chan struct{}
 }
 
 func (svc *AuthService) Start(ctx context.Context, clientId string, clientSecret string, providerType authProviderTypes.AuthProviderType, wg *sync.WaitGroup) error {
+	svc.loggedId = make(chan struct{})
+
 	providerEndpoint, err := getProviderEndpoints(providerType)
 	if err != nil {
 		return fmt.Errorf("failed to get provider url: %s", err.Error())
@@ -46,6 +53,10 @@ func (svc *AuthService) Start(ctx context.Context, clientId string, clientSecret
 		},
 	}
 	svc.verifier = oauth2.GenerateVerifier()
+	svc.state, err = generateState()
+	if err != nil {
+		return fmt.Errorf("failed to initialize state: %s", err.Error())
+	}
 
 	handler := http.NewServeMux()
 	handler.HandleFunc("/login", svc.handleLogin)
@@ -94,7 +105,28 @@ func (svc *AuthService) Login() error {
 		return fmt.Errorf("failed to open browser: %s", err.Error())
 	}
 
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("login timed out")
+			}
+		case <-svc.loggedId:
+			return nil
+		}
+	}
+}
+
+func (svc *AuthService) GetAccessToken() (string, error) {
+	accessToken, err := svc.loadAccessToken()
+	if err != nil {
+		return "", fmt.Errorf("failed to load access token: %s", err.Error())
+	}
+
+	return accessToken, nil
 }
 
 func (svc *AuthService) listenAndServe(wg *sync.WaitGroup) error {
@@ -109,15 +141,22 @@ func (svc *AuthService) listenAndServe(wg *sync.WaitGroup) error {
 }
 
 func (svc *AuthService) handleLogin(resWrtr http.ResponseWriter, req *http.Request) {
-	authCodeUrl := svc.oauth2Config.AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.VerifierOption(svc.verifier))
+	authCodeUrl := svc.oauth2Config.AuthCodeURL(svc.state, oauth2.AccessTypeOffline, oauth2.VerifierOption(svc.verifier))
 	http.Redirect(resWrtr, req, authCodeUrl, http.StatusFound)
 }
 
 func (svc *AuthService) handleCallback(resWrtr http.ResponseWriter, req *http.Request) {
 	ctx := context.Background()
 	code := req.URL.Query().Get("code")
+	state := req.URL.Query().Get("state")
+
 	if code == "" {
 		http.Error(resWrtr, "authorization code is required", http.StatusBadRequest)
+		return
+	}
+
+	if state != svc.state {
+		http.Error(resWrtr, "invalid state", http.StatusBadRequest)
 		return
 	}
 
@@ -129,6 +168,8 @@ func (svc *AuthService) handleCallback(resWrtr http.ResponseWriter, req *http.Re
 
 	svc.saveAccessToken(oauth2Token.AccessToken)
 	resWrtr.WriteHeader(http.StatusNoContent)
+
+	svc.loggedId <- struct{}{}
 }
 
 func (svc *AuthService) saveAccessToken(accessToken string) error {
@@ -159,6 +200,19 @@ func (svc *AuthService) loadAccessToken() (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func AddAuthHeader(req *http.Request, accessToken string) {
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+}
+
+func generateState() (string, error) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random state: %s", err.Error())
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
 func getProviderEndpoints(providerType authProviderTypes.AuthProviderType) (oauth2.Endpoint, error) {

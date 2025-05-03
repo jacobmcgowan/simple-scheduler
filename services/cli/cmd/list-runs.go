@@ -29,10 +29,9 @@ var runsCmd = &cobra.Command{
 	Short:   "Lists runs",
 	Long: `Provides details on the runs for the current jobs that are
 scheduled.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if !validators.ValidateRunStatus(listRunsOptions.Status, true) {
-			fmt.Printf("Invalid run status. Acceptable statuses are %s.", statusChoices)
-			return
+			return fmt.Errorf("invalid run status; acceptable statuses are %s", statusChoices)
 		}
 
 		filter := dtos.RunFilter{}
@@ -44,8 +43,15 @@ scheduled.`,
 			filter.Status = &runStatus
 		}
 
+		authSvc := services.AuthService{}
+		token, err := authSvc.GetAccessToken()
+		if err != nil {
+			return fmt.Errorf("failed to get access token: %s", err.Error())
+		}
+
 		svc := services.RunService{
-			ApiUrl: ApiUrl,
+			ApiUrl:      ApiUrl,
+			AccessToken: token,
 		}
 
 		if runs, err := svc.Browse(filter); err == nil {
@@ -58,8 +64,10 @@ scheduled.`,
 
 			writer.Flush()
 		} else {
-			fmt.Printf("Failed to get runs: %s\n", err)
+			return fmt.Errorf("Failed to get runs: %s", err.Error())
 		}
+
+		return nil
 	},
 }
 

@@ -52,12 +52,19 @@ enabled status of the job named "myjob".`,
 			jobUpdate.NextRunAt = &nextRunAtTime
 		}
 
+		authSvc := services.AuthService{}
+		token, err := authSvc.GetAccessToken()
+		if err != nil {
+			return fmt.Errorf("failed to get access token: %s", err.Error())
+		}
+
 		svc := services.JobService{
-			ApiUrl: ApiUrl,
+			ApiUrl:      ApiUrl,
+			AccessToken: token,
 		}
 
 		if err := svc.Edit(updateJobOptions.Name, jobUpdate); err != nil {
-			return fmt.Errorf("failed to update job: %s", err)
+			return fmt.Errorf("failed to update job: %s", err.Error())
 		}
 
 		return nil

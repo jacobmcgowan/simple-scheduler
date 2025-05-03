@@ -11,16 +11,24 @@ import (
 )
 
 type RunService struct {
-	ApiUrl string
+	ApiUrl      string
+	AccessToken string
 }
 
-func (srv RunService) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
+func (svc RunService) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 	qb := httpHelpers.NewQueryBuilder()
 	qb.Add("jobName", filter.JobName)
 	qb.Add("status", (*string)(filter.Status))
 
-	url := fmt.Sprintf("%s/runs%s", srv.ApiUrl, qb.String())
-	resp, err := http.Get(url)
+	url := fmt.Sprintf("%s/runs%s", svc.ApiUrl, qb.String())
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", svc.AccessToken))
+	client := http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -40,9 +48,16 @@ func (srv RunService) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 	return runs, nil
 }
 
-func (srv RunService) Read(id string) (dtos.Run, error) {
-	url := fmt.Sprintf("%s/runs/%s", srv.ApiUrl, id)
-	resp, err := http.Get(url)
+func (svc RunService) Read(id string) (dtos.Run, error) {
+	url := fmt.Sprintf("%s/runs/%s", svc.ApiUrl, id)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return dtos.Run{}, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", svc.AccessToken))
+	client := http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return dtos.Run{}, err
 	}
@@ -62,9 +77,16 @@ func (srv RunService) Read(id string) (dtos.Run, error) {
 	return run, nil
 }
 
-func (srv RunService) Cancel(id string) error {
-	url := fmt.Sprintf("%s/runs/%s", srv.ApiUrl, id)
-	_, err := http.Get(url)
+func (svc RunService) Cancel(id string) error {
+	url := fmt.Sprintf("%s/runs/%s", svc.ApiUrl, id)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", svc.AccessToken))
+	client := http.Client{}
+	_, err = client.Do(req)
 	if err != nil {
 		return err
 	}
