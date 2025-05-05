@@ -178,7 +178,7 @@ func (svc *AuthService) saveAccessToken(accessToken string) error {
 		return fmt.Errorf("failed to get user home directory: %s", err.Error())
 	}
 
-	filePath := fmt.Sprintf("%s/%s", CacheFileName, dir)
+	filePath := fmt.Sprintf("%s/%s", dir, CacheFileName)
 	err = os.WriteFile(filePath, []byte(accessToken), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to cache the access token: %s", err.Error())
@@ -193,7 +193,7 @@ func (svc *AuthService) loadAccessToken() (string, error) {
 		return "", fmt.Errorf("failed to get user home directory: %s", err.Error())
 	}
 
-	filePath := fmt.Sprintf("%s/%s", CacheFileName, dir)
+	filePath := fmt.Sprintf("%s/%s", dir, CacheFileName)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read the cache: %s", err.Error())

@@ -64,7 +64,7 @@ scheduled.`,
 
 			writer.Flush()
 		} else {
-			return fmt.Errorf("Failed to get runs: %s", err.Error())
+			return fmt.Errorf("failed to get runs: %s", err.Error())
 		}
 
 		return nil

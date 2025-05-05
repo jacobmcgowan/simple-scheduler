@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -17,8 +18,8 @@ one-time jobs. This CLI application allows you to view and manage these jobs.`,
 }
 
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
+		log.Printf("Error: %s", err.Error())
 		os.Exit(1)
 	}
 }
