@@ -12,7 +12,5 @@ const (
 	HeartbeatTimeout           = "SIMPLE_SCHEDULER_HEARTBEAT_TIMEOUT"
 	HeartbeatInterval          = "SIMPLE_SCHEDULER_HEARTBEAT_INTERVAL"
 	ApiUrl                     = "SIMPLE_SCHEDULER_API_URL"
-	Oauth2RedirectUrl          = "SIMPLE_SCHEDULER_OAUTH2_REDIRECT_URL"
-	Oauth2Secret               = "SIMPLE_SCHEDULER_OAUTH2_SECRET"
-	Oauth2ProviderType         = "SIMPLE_SCHEDULER_OAUTH2_PROVIDER_TYPE"
+	OidcIssuer                 = "SIMPLE_SCHEDULER_OIDC_ISSUER"
 )

@@ -11,7 +11,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "args": ["login", "-i", "Ov23liHrhvpMOPsQEDwc", "-s", "5f2611dffcdca780d3643af330a69ccd2ac099d5", "-p", "github"]
+            "args": []
         }
     ]
 }

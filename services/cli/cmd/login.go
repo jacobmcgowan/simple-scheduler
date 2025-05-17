@@ -20,7 +20,7 @@ var loginCmd = &cobra.Command{
 		wg := sync.WaitGroup{}
 		authSvc := services.AuthService{}
 
-		if err := authSvc.Start(cmd.Context(), loginOptions.ClientId, loginOptions.ClientSecret, loginOptions.ProviderType, &wg); err != nil {
+		if err := authSvc.Start(cmd.Context(), loginOptions.ClientId, loginOptions.ClientSecret, loginOptions.Issuer, &wg); err != nil {
 			return fmt.Errorf("failed to start auth service: %s", err)
 		}
 
@@ -38,10 +38,10 @@ var loginCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(loginCmd)
-	loginCmd.Flags().StringVarP(&loginOptions.ClientId, "client-id", "i", "", "The client id to use for login.")
+	loginCmd.Flags().StringVarP(&loginOptions.ClientId, "client-id", "c", "", "The client id to use for login.")
 	loginCmd.MarkFlagRequired("client-id")
 	loginCmd.Flags().StringVarP(&loginOptions.ClientSecret, "client-secret", "s", "", "The client secret to use for login.")
 	loginCmd.MarkFlagRequired("client-secret")
-	loginCmd.Flags().VarP(&loginOptions.ProviderType, "provider", "p", "The provider to use for login. Supported values are: github")
-	loginCmd.MarkFlagRequired("provider")
+	loginCmd.Flags().StringVarP(&loginOptions.Issuer, "issuer", "i", "", "The OIDC issuer to use for login.")
+	loginCmd.MarkFlagRequired("issuer")
 }

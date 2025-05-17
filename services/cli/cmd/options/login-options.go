@@ -1,9 +1,7 @@
 package options
 
-import authProviderTypes "github.com/jacobmcgowan/simple-scheduler/shared/auth/auth-provider-types"
-
 type LoginOptions struct {
-	ProviderType authProviderTypes.AuthProviderType
+	Issuer       string
 	ClientId     string
 	ClientSecret string
 }

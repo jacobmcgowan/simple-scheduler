@@ -14,9 +14,8 @@ import (
 	"sync"
 	"time"
 
-	authProviderTypes "github.com/jacobmcgowan/simple-scheduler/shared/auth/auth-provider-types"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/endpoints"
 )
 
 const CliAddr = "localhost:5556"
@@ -26,36 +25,35 @@ const CacheFileName = ".simple-scheduler-cli-cache"
 type AuthService struct {
 	ApiUrl       string
 	oauth2Config oauth2.Config
-	verifier     string
+	verifier     *oidc.IDTokenVerifier
 	server       http.Server
-	state        string
 	loggedId     chan struct{}
 }
 
-func (svc *AuthService) Start(ctx context.Context, clientId string, clientSecret string, providerType authProviderTypes.AuthProviderType, wg *sync.WaitGroup) error {
+func (svc *AuthService) Start(ctx context.Context, clientId string, clientSecret string, issuer string, wg *sync.WaitGroup) error {
 	svc.loggedId = make(chan struct{})
 
-	providerEndpoint, err := getProviderEndpoints(providerType)
+	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
-		return fmt.Errorf("failed to get provider url: %s", err.Error())
+		return fmt.Errorf("failed to create provider: %s", err.Error())
 	}
+	oidcConfig := &oidc.Config{
+		ClientID: clientId,
+	}
+	svc.verifier = provider.Verifier(oidcConfig)
 
 	svc.oauth2Config = oauth2.Config{
 		ClientID:     clientId,
 		ClientSecret: clientSecret,
 		RedirectURL:  fmt.Sprintf("%s/callback", CliUrl),
-		Endpoint:     providerEndpoint,
+		Endpoint:     provider.Endpoint(),
 		Scopes: []string{
+			oidc.ScopeOpenID,
 			"jobs:read",
 			"jobs:write",
 			"runs:read",
 			"runs:write",
 		},
-	}
-	svc.verifier = oauth2.GenerateVerifier()
-	svc.state, err = generateState()
-	if err != nil {
-		return fmt.Errorf("failed to initialize state: %s", err.Error())
 	}
 
 	handler := http.NewServeMux()
@@ -140,35 +138,75 @@ func (svc *AuthService) listenAndServe(wg *sync.WaitGroup) error {
 	return nil
 }
 
-func (svc *AuthService) handleLogin(resWrtr http.ResponseWriter, req *http.Request) {
-	authCodeUrl := svc.oauth2Config.AuthCodeURL(svc.state, oauth2.AccessTypeOffline, oauth2.VerifierOption(svc.verifier))
-	http.Redirect(resWrtr, req, authCodeUrl, http.StatusFound)
+func (svc *AuthService) handleLogin(wrtr http.ResponseWriter, req *http.Request) {
+	state, err := randString()
+	if err != nil {
+		http.Error(wrtr, fmt.Sprintf("failed to generate state: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
+	setCookie(wrtr, req, "state", state)
+
+	nonce, err := randString()
+	if err != nil {
+		http.Error(wrtr, fmt.Sprintf("failed to generate nonce: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
+	setCookie(wrtr, req, "nonce", nonce)
+
+	http.Redirect(wrtr, req, svc.oauth2Config.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
 }
 
 func (svc *AuthService) handleCallback(resWrtr http.ResponseWriter, req *http.Request) {
 	ctx := context.Background()
-	code := req.URL.Query().Get("code")
-	state := req.URL.Query().Get("state")
+	state, err := req.Cookie("state")
+	if err != nil {
+		http.Error(resWrtr, fmt.Sprintf("failed to get state cookie: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	if req.URL.Query().Get("state") != state.Value {
+		http.Error(resWrtr, "state did not match", http.StatusBadRequest)
+		return
+	}
 
+	code := req.URL.Query().Get("code")
 	if code == "" {
 		http.Error(resWrtr, "authorization code is required", http.StatusBadRequest)
 		return
 	}
 
-	if state != svc.state {
-		http.Error(resWrtr, "invalid state", http.StatusBadRequest)
-		return
-	}
-
-	oauth2Token, err := svc.oauth2Config.Exchange(ctx, code, oauth2.VerifierOption(svc.verifier))
+	oauth2Token, err := svc.oauth2Config.Exchange(ctx, code)
 	if err != nil {
 		http.Error(resWrtr, fmt.Sprintf("failed to exchange token: %s", err.Error()), http.StatusInternalServerError)
 		return
 	}
 
-	svc.saveAccessToken(oauth2Token.AccessToken)
-	resWrtr.WriteHeader(http.StatusNoContent)
+	rawIdToken, ok := oauth2Token.Extra("id_token").(string)
+	if !ok {
+		http.Error(resWrtr, "id_token not found in token", http.StatusInternalServerError)
+		return
+	}
+	idToken, err := svc.verifier.Verify(ctx, rawIdToken)
+	if err != nil {
+		http.Error(resWrtr, fmt.Sprintf("failed to verify id_token: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
 
+	nonce, err := req.Cookie("nonce")
+	if err != nil {
+		http.Error(resWrtr, fmt.Sprintf("failed to get nonce cookie: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
+	if idToken.Nonce != nonce.Value {
+		http.Error(resWrtr, "nonce did not match", http.StatusBadRequest)
+		return
+	}
+
+	if err = svc.saveAccessToken(oauth2Token.AccessToken); err != nil {
+		http.Error(resWrtr, fmt.Sprintf("failed to save access token: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	resWrtr.WriteHeader(http.StatusNoContent)
 	svc.loggedId <- struct{}{}
 }
 
@@ -206,7 +244,7 @@ func AddAuthHeader(req *http.Request, accessToken string) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 }
 
-func generateState() (string, error) {
+func randString() (string, error) {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -215,13 +253,15 @@ func generateState() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-func getProviderEndpoints(providerType authProviderTypes.AuthProviderType) (oauth2.Endpoint, error) {
-	switch providerType {
-	case authProviderTypes.GitHub:
-		return endpoints.GitHub, nil
-	default:
-		return oauth2.Endpoint{}, fmt.Errorf("unsupported provider type: %s", providerType)
+func setCookie(wrtr http.ResponseWriter, req *http.Request, name string, value string) {
+	cookie := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		MaxAge:   int(time.Hour.Seconds()),
+		Secure:   req.TLS != nil,
+		HttpOnly: true,
 	}
+	http.SetCookie(wrtr, cookie)
 }
 
 func isWsl() bool {

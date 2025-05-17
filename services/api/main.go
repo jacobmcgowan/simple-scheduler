@@ -16,7 +16,6 @@ import (
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
 	envVars "github.com/jacobmcgowan/simple-scheduler/shared/resources/env-vars"
 	"github.com/joho/godotenv"
-	ginoauth2 "github.com/zalando/gin-oauth2"
 )
 
 func main() {
@@ -48,16 +47,13 @@ func main() {
 	defer dbResources.Context.Disconnect()
 	log.Println("Connected to database")
 
-	router := gin.Default()
-	err = auth.RegisterAuth(router)
-	if err != nil {
-		log.Fatalf("Failed to register OAuth2 provider: %s", err)
+	authCache := &auth.AuthCache{
+		Issuer: os.Getenv(envVars.OidcIssuer),
 	}
-
+	router := gin.Default()
 	router.Use(middleware.ErrorHandler())
-	router.Use(ginoauth2.RequestLogger([]string{"uid"}, "data"))
 	router.Use(gin.Recovery())
-	controllers.RegisterControllers(router, dbResources.JobRepo, dbResources.RunRepo)
+	controllers.RegisterControllers(router, authCache, dbResources.JobRepo, dbResources.RunRepo)
 
 	srv := &http.Server{
 		Addr:    os.Getenv(envVars.ApiUrl),
