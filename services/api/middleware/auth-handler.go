@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -54,7 +55,7 @@ func AuthHandler(cache *auth.AuthCache, reqScopes []string) gin.HandlerFunc {
 
 		issuer, err := token.Claims.GetIssuer()
 		if err != nil {
-			log.Printf("Error getting issuer from token: %s", err.Error())
+			log.Printf("Error getting issuer from access token: %s", err.Error())
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid issuer"})
 			ctx.Abort()
 			return
@@ -65,9 +66,22 @@ func AuthHandler(cache *auth.AuthCache, reqScopes []string) gin.HandlerFunc {
 			return
 		}
 
+		expiresAt, err := token.Claims.GetExpirationTime()
+		if err != nil {
+			log.Printf("Error getting expiration time from access token: %s", err.Error())
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid expiration time"})
+			ctx.Abort()
+			return
+		}
+		if expiresAt.Before(time.Now()) {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Access token has expired"})
+			ctx.Abort()
+			return
+		}
+
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			log.Printf("Error getting claims from token")
+			log.Printf("Error getting claims from access token")
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
 			ctx.Abort()
 			return
