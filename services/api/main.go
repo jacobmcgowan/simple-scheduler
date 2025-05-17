@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jacobmcgowan/simple-scheduler/services/api/auth"
 	controllers "github.com/jacobmcgowan/simple-scheduler/services/api/contollers"
 	"github.com/jacobmcgowan/simple-scheduler/services/api/middleware"
 	"github.com/jacobmcgowan/simple-scheduler/shared/resources"
@@ -46,9 +47,13 @@ func main() {
 	defer dbResources.Context.Disconnect()
 	log.Println("Connected to database")
 
+	authCache := &auth.AuthCache{
+		Issuer: os.Getenv(envVars.OidcIssuer),
+	}
 	router := gin.Default()
 	router.Use(middleware.ErrorHandler())
-	controllers.RegisterControllers(router, dbResources.JobRepo, dbResources.RunRepo)
+	router.Use(gin.Recovery())
+	controllers.RegisterControllers(router, authCache, dbResources.JobRepo, dbResources.RunRepo)
 
 	srv := &http.Server{
 		Addr:    os.Getenv(envVars.ApiUrl),

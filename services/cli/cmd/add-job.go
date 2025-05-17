@@ -23,6 +23,12 @@ var addJobCmd = &cobra.Command{
 			return fmt.Errorf("nextRunAt, %s, is not a valid RFC3339 datetime", addJobOptions.NextRunAt)
 		}
 
+		authSvc := services.AuthService{}
+		token, err := authSvc.GetAccessToken()
+		if err != nil {
+			return fmt.Errorf("failed to get access token: %s", err)
+		}
+
 		job := dtos.Job{
 			Name:                addJobOptions.Name,
 			Enabled:             addJobOptions.Enabled,
@@ -34,11 +40,12 @@ var addJobCmd = &cobra.Command{
 			AllowConcurrentRuns: addJobOptions.AllowConcurrentRuns,
 			HeartbeatTimeout:    addJobOptions.HeartbeatTimeout,
 		}
-		svc := services.JobService{
-			ApiUrl: ApiUrl,
+		jobSvc := services.JobService{
+			ApiUrl:      ApiUrl,
+			AccessToken: token,
 		}
 
-		if _, err := svc.Add(job); err != nil {
+		if _, err := jobSvc.Add(job); err != nil {
 			return fmt.Errorf("failed to add job: %s", err)
 		}
 
