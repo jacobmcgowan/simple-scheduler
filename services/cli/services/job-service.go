@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	httpHelpers "github.com/jacobmcgowan/simple-scheduler/services/cli/http-helpers"
 	"github.com/jacobmcgowan/simple-scheduler/shared/dtos"
 )
 
@@ -28,8 +29,12 @@ func (svc JobService) Browse() ([]dtos.Job, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpHelpers.ParseError(resp, "failed to get jobs")
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -57,8 +62,12 @@ func (svc JobService) Read(name string) (dtos.Job, error) {
 	if err != nil {
 		return dtos.Job{}, err
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return dtos.Job{}, httpHelpers.ParseError(resp, "failed to get job")
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return dtos.Job{}, err
@@ -92,8 +101,12 @@ func (svc JobService) Add(job dtos.Job) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", httpHelpers.ParseError(resp, "failed to add job")
+	}
+
 	if resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
@@ -131,8 +144,12 @@ func (svc JobService) Edit(name string, jobUpdate dtos.JobUpdate) error {
 	if err != nil {
 		return err
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return httpHelpers.ParseError(resp, "failed to update job")
+	}
+
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}

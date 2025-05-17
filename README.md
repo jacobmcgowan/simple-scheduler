@@ -166,6 +166,43 @@ This service provides a RESTful API to manage jobs and runs.
 #### Running
 The API currently has the following dependencies:
 - [MongoDB](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-community-with-docker/)
+- An OpenID provider such as [Keycloak](https://www.keycloak.org/getting-started/getting-started-docker)
+
+If using Keycloak, you can import the [example realm](examples/keycloak-example-realm.json)
+but be aware that this example configuration is for development purposes only
+and should not be used in production. This example includes the following:
+
+- Realm: simple-scheduler
+- Client:
+  - Client ID: simple-scheduler-cli
+  - Client Secret: See [Clients > simple-scheduler-cli > Credentials](http://localhost:8080/admin/master/console/#/simple-scheduler/clients/9b9111f9-a0bd-499f-b7e3-9788b18165b2/credentials)
+  - Roles:
+    - jobs:read
+    - jobs:write
+    - runs:read
+    - runs:write
+  - Scopes:
+    - jobs:read
+    - jobs:write
+    - runs:read
+    - runs:write
+- User:
+  - Usernname: guest
+  - Password: guest
+  - Roles:
+    - jobs:read
+    - jobs:write
+    - runs:read
+    - runs:write
+
+If using a different OpenID provider or a different configuration, ensure that
+you create a client for the CLI and any other client that will access the API
+with a redirection URI of `http://localhost:5556/callback` (used by the CLI) and
+the following roles and scopes:
+- jobs:read
+- jobs:write
+- runs:read
+- runs:write
 
 Once the dependencies are running, you can run the API locally using
 ```bash
@@ -191,6 +228,7 @@ The API supports the following settings set in the .env file:
 | SIMPLE_SCHEDULER_DB_CONNECTION_STRING         | The connection string of the database.                                                     |
 | SIMPLE_SCHEDULER_DB_NAME                      | The name of the database to connect to.                                                    |
 | SIMPLE_SCHEDULER_MESSAGEBUS_CONNECTION_STRING | The connection string of the message bus.                                                  |
+| SIMPLE_SCHEDULER_OIDC_ISSUER                  | The URL of the OIDC issuer to use. e.g. http://localhost:8080/realms/simple-scheduler      |
 
 ### CLI
 This application allows you to manage jobs and runs in a terminal.

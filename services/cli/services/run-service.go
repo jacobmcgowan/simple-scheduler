@@ -32,8 +32,12 @@ func (svc RunService) Browse(filter dtos.RunFilter) ([]dtos.Run, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpHelpers.ParseError(resp, "failed to get runs")
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -61,8 +65,12 @@ func (svc RunService) Read(id string) (dtos.Run, error) {
 	if err != nil {
 		return dtos.Run{}, err
 	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return dtos.Run{}, httpHelpers.ParseError(resp, "failed to get run")
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return dtos.Run{}, err
@@ -86,9 +94,14 @@ func (svc RunService) Cancel(id string) error {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", svc.AccessToken))
 	client := http.Client{}
-	_, err = client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return httpHelpers.ParseError(resp, "failed to cancel run")
 	}
 
 	return nil
