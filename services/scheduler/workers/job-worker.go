@@ -24,6 +24,7 @@ type JobWorker struct {
 	actionQueue    string
 	statusQueue    string
 	heartbeatQueue string
+	stopOnce       sync.Once
 }
 
 func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
@@ -78,17 +79,17 @@ func (worker *JobWorker) Start(wg *sync.WaitGroup) error {
 }
 
 func (worker *JobWorker) Stop() {
+	worker.stopOnce.Do(func() {
+		log.Printf("Stopping job %s...", worker.Job.Name)
+		worker.MessageBus.Unsubscribe(worker.statusQueue)
+		worker.MessageBus.Unsubscribe(worker.heartbeatQueue)
+		close(worker.quit)
+	})
+}
+
+func (worker *JobWorker) stopped() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
-
-	if !worker.isRunning {
-		return
-	}
-
-	log.Printf("Stopping job %s...", worker.Job.Name)
-	worker.MessageBus.Unsubscribe(worker.statusQueue)
-	worker.MessageBus.Unsubscribe(worker.heartbeatQueue)
-	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
@@ -228,12 +229,16 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 
+	nextRunTimer := time.NewTimer(time.Until(worker.Job.NextRunAt))
+	defer nextRunTimer.Stop()
+
 	for {
 		select {
 		case <-worker.quit:
 			log.Printf("Stopped job %s", worker.Job.Name)
+			worker.stopped()
 			return
-		case <-time.After(time.Until(worker.Job.NextRunAt)):
+		case <-nextRunTimer.C:
 			log.Printf("Starting run for job %s...", worker.Job.Name)
 
 			if err := worker.startRun(); err != nil {
@@ -247,6 +252,7 @@ func (worker *JobWorker) process(wg *sync.WaitGroup) {
 				worker.Stop()
 			} else {
 				log.Printf("Next run for job %s is at %s", worker.Job.Name, worker.Job.NextRunAt.String())
+				nextRunTimer.Reset(time.Until(worker.Job.NextRunAt))
 			}
 		}
 	}

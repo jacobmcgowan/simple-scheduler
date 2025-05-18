@@ -24,11 +24,13 @@ type ManagerWorker struct {
 	CleanupDuration      time.Duration
 	HeartbeatDuration    time.Duration
 	nextCacheRefreshAt   time.Time
+	jobsLock             sync.Mutex `default:"sync.Mutex{}"`
 	jobs                 map[string]*JobWorker
 	custodians           map[string]*RunCustodian
 	quit                 chan struct{}
 	isRunningLock        sync.Mutex `default:"sync.Mutex{}"`
 	isRunning            bool
+	stopOnce             sync.Once
 }
 
 func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
@@ -44,6 +46,9 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
 		return fmt.Errorf("failed to start job manager @%s: %s", worker.Hostname, err)
 	}
 
+	worker.jobsLock.Lock()
+	defer worker.jobsLock.Unlock()
+
 	worker.jobs = make(map[string]*JobWorker)
 	worker.custodians = make(map[string]*RunCustodian)
 	worker.quit = make(chan struct{})
@@ -57,11 +62,15 @@ func (worker *ManagerWorker) Start(wg *sync.WaitGroup) error {
 }
 
 func (worker *ManagerWorker) Stop() {
+	worker.stopOnce.Do(func() {
+		log.Printf("Stopping job manager %s@%s...", worker.Id, worker.Hostname)
+		close(worker.quit)
+	})
+}
+
+func (worker *ManagerWorker) stopped() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
-
-	log.Printf("Stopping job manager %s@%s...", worker.Id, worker.Hostname)
-	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
@@ -82,6 +91,9 @@ func (worker *ManagerWorker) registerWorker() error {
 }
 
 func (worker *ManagerWorker) refreshCache(wg *sync.WaitGroup) error {
+	worker.jobsLock.Lock()
+	defer worker.jobsLock.Unlock()
+
 	worker.nextCacheRefreshAt = time.Now().Add(worker.CacheRefreshDuration)
 	refreshedJobs := make(map[string]bool)
 	filter := dtos.JobLockFilter{
@@ -178,6 +190,9 @@ func (worker *ManagerWorker) setHeartbeat() error {
 }
 
 func (worker *ManagerWorker) stopAllJobs() error {
+	worker.jobsLock.Lock()
+	defer worker.jobsLock.Unlock()
+
 	for name, job := range worker.jobs {
 		job.Stop()
 		delete(worker.jobs, name)
@@ -202,6 +217,12 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 
+	cacheRefreshTimer := time.NewTimer(time.Until(worker.nextCacheRefreshAt))
+	defer cacheRefreshTimer.Stop()
+
+	hrtbtTicker := time.NewTicker(worker.HeartbeatDuration)
+	defer hrtbtTicker.Stop()
+
 	for {
 		select {
 		case <-worker.quit:
@@ -210,15 +231,17 @@ func (worker *ManagerWorker) process(wg *sync.WaitGroup) {
 			}
 
 			log.Printf("Stopped job manager %s@%s\n", worker.Id, worker.Hostname)
+			worker.stopped()
 			return
-		case <-time.After(time.Until(worker.nextCacheRefreshAt)):
+		case <-cacheRefreshTimer.C:
 			log.Printf("Refreshing jobs cache for manager %s@%s...", worker.Id, worker.Hostname)
 			if err := worker.refreshCache(wg); err != nil {
 				log.Printf("Failed to refresh jobs cache for manager %s@%s: %s", worker.Id, worker.Hostname, err)
 			} else {
 				log.Printf("Refreshed jobs cache, %d loaded, for manager %s@%s", len(worker.jobs), worker.Id, worker.Hostname)
 			}
-		case <-time.After(worker.HeartbeatDuration):
+			cacheRefreshTimer.Reset(time.Until(worker.nextCacheRefreshAt))
+		case <-hrtbtTicker.C:
 			log.Printf("Setting heartbeat of jobs for manager %s@%s...", worker.Id, worker.Hostname)
 			if err := worker.setHeartbeat(); err != nil {
 				log.Printf("Failed to set heartbeat for manager %s@%s: %s", worker.Id, worker.Hostname, err)

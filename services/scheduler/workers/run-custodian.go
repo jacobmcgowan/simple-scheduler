@@ -25,6 +25,7 @@ type RunCustodian struct {
 	isRunning     bool
 	actionQueue   string
 	statusQueue   string
+	stopOnce      sync.Once
 }
 
 func (worker *RunCustodian) Start(wg *sync.WaitGroup) error {
@@ -59,15 +60,22 @@ func (worker *RunCustodian) Start(wg *sync.WaitGroup) error {
 }
 
 func (worker *RunCustodian) Stop() {
+	worker.stopOnce.Do(func() {
+		worker.isRunningLock.Lock()
+		defer worker.isRunningLock.Unlock()
+
+		if !worker.isRunning {
+			return
+		}
+
+		log.Printf("Stopping run custodian for job %s...", worker.Job.Name)
+		close(worker.quit)
+	})
+}
+
+func (worker *RunCustodian) stopped() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
-
-	if !worker.isRunning {
-		return
-	}
-
-	log.Printf("Stopping run custodian for job %s...", worker.Job.Name)
-	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
@@ -216,12 +224,16 @@ func (worker *RunCustodian) process(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 
+	ticker := time.NewTicker(worker.Duration)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-worker.quit:
 			log.Printf("Stopped run custodian for job %s", worker.Job.Name)
+			worker.stopped()
 			return
-		case <-time.After(worker.Duration):
+		case <-ticker.C:
 			if err := worker.clean(); err != nil {
 				log.Printf("Failed to clean runs for job %s: %s", worker.Job.Name, err)
 			}

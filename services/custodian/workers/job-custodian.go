@@ -17,6 +17,7 @@ type JobCustodian struct {
 	quit             chan struct{}
 	isRunningLock    sync.Mutex `default:"sync.Mutex{}"`
 	isRunning        bool
+	stopOnce         sync.Once
 }
 
 func (worker *JobCustodian) Start(wg *sync.WaitGroup) error {
@@ -51,15 +52,22 @@ func (worker *JobCustodian) restartStuckJobs() (int64, error) {
 }
 
 func (worker *JobCustodian) Stop() {
+	worker.stopOnce.Do(func() {
+		worker.isRunningLock.Lock()
+		defer worker.isRunningLock.Unlock()
+
+		if !worker.isRunning {
+			return
+		}
+
+		log.Printf("Stopping job custodian...")
+		close(worker.quit)
+	})
+}
+
+func (worker *JobCustodian) stopped() {
 	worker.isRunningLock.Lock()
 	defer worker.isRunningLock.Unlock()
-
-	if !worker.isRunning {
-		return
-	}
-
-	log.Printf("Stopping job custodian...")
-	worker.quit <- struct{}{}
 	worker.isRunning = false
 }
 
@@ -67,12 +75,16 @@ func (worker *JobCustodian) process(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 
+	ticker := time.NewTicker(worker.Duration)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-worker.quit:
 			log.Printf("Stopped job custodian")
+			worker.stopped()
 			return
-		case <-time.After(worker.Duration):
+		case <-ticker.C:
 			if count, err := worker.restartStuckJobs(); err != nil {
 				log.Printf("Failed to restart stuck jobs: %s", err)
 			} else {
