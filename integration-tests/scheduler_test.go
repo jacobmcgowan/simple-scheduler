@@ -387,53 +387,49 @@ func TestConcurrentManagerWorkers(t *testing.T) {
 	err = mngrB.Start(&wg)
 	require.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 50)
+	require.Eventually(t, func() bool {
+		updatedJobs, err := dbResources.JobRepo.Browse()
+		require.NoError(t, err)
 
-	updatedJobs, err := dbResources.JobRepo.Browse()
-	require.NoError(t, err)
+		mngrAJobs := []string{}
+		mngrBJobs := []string{}
+		unmngedJobs := []string{}
 
-	mngrAJobs := []string{}
-	mngrBJobs := []string{}
-	unmngedJobs := []string{}
-
-	for _, job := range updatedJobs {
-		if job.ManagerId == mngrA.Id {
-			mngrAJobs = append(mngrAJobs, job.Name)
-		} else if job.ManagerId == mngrB.Id {
-			mngrBJobs = append(mngrBJobs, job.Name)
-		} else {
-			unmngedJobs = append(unmngedJobs, job.Name)
+		for _, job := range updatedJobs {
+			if job.ManagerId == mngrA.Id {
+				mngrAJobs = append(mngrAJobs, job.Name)
+			} else if job.ManagerId == mngrB.Id {
+				mngrBJobs = append(mngrBJobs, job.Name)
+			} else {
+				unmngedJobs = append(unmngedJobs, job.Name)
+			}
 		}
-	}
 
-	require.Len(t, mngrAJobs, 2)
-	require.Len(t, mngrBJobs, 1)
-	require.Len(t, unmngedJobs, 1)
+		return len(mngrAJobs) == 2 && len(mngrBJobs) == 1 && len(unmngedJobs) == 1
+	}, time.Second*5, time.Millisecond*50, "Expected jobs to be assigned to managers")
 
 	mngrA.Stop()
 	mngrB.Stop()
 	wg.Wait()
 
-	time.Sleep(time.Millisecond * 50)
+	require.Eventually(t, func() bool {
+		updatedJobs, err := dbResources.JobRepo.Browse()
+		require.NoError(t, err)
 
-	updatedJobs, err = dbResources.JobRepo.Browse()
-	require.NoError(t, err)
+		mngrAJobs := []string{}
+		mngrBJobs := []string{}
+		unmngedJobs := []string{}
 
-	mngrAJobs = []string{}
-	mngrBJobs = []string{}
-	unmngedJobs = []string{}
-
-	for _, job := range updatedJobs {
-		if job.ManagerId == mngrA.Id {
-			mngrAJobs = append(mngrAJobs, job.Name)
-		} else if job.ManagerId == mngrB.Id {
-			mngrBJobs = append(mngrBJobs, job.Name)
-		} else {
-			unmngedJobs = append(unmngedJobs, job.Name)
+		for _, job := range updatedJobs {
+			if job.ManagerId == mngrA.Id {
+				mngrAJobs = append(mngrAJobs, job.Name)
+			} else if job.ManagerId == mngrB.Id {
+				mngrBJobs = append(mngrBJobs, job.Name)
+			} else {
+				unmngedJobs = append(unmngedJobs, job.Name)
+			}
 		}
-	}
 
-	require.Len(t, mngrAJobs, 0)
-	require.Len(t, mngrBJobs, 0)
-	require.Len(t, unmngedJobs, 4)
+		return len(mngrAJobs) == 0 && len(mngrBJobs) == 0 && len(unmngedJobs) == 4
+	}, time.Second*5, time.Millisecond*50, "Expected all jobs to be unassigned after stopping managers")
 }
